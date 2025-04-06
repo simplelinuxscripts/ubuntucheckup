@@ -8,7 +8,7 @@
 
 Warning or error messages are displayed for each potential safety or health issue in Ubuntu installation.  
 Update this script and its associated files depending on your installation.  
-Then running this script regularly will ensure nothing critical has changed or has been corrupted in your Ubuntu installation.
+Then running this script regularly will ensure nothing critical has changed or has been corrupted.
 
 ### EXAMPLE
 
