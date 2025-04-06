@@ -12,4 +12,5 @@ Then running this script regularly will ensure nothing critical has changed or h
 
 ### EXAMPLE
 
-![example_1](https://github.com/user-attachments/assets/6b020e7a-6514-47ed-9e82-0206e8cd315e)
+![example_1](https://github.com/user-attachments/assets/c2800327-82b8-4a46-9563-17586b0f286f)
+
