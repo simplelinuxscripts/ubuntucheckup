@@ -12,3 +12,4 @@ Then running this script regularly will ensure nothing critical has changed or w
 
 ### EXAMPLE
 
+![example_1](https://github.com/user-attachments/assets/6b020e7a-6514-47ed-9e82-0206e8cd315e)
