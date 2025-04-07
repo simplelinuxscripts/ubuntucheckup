@@ -29,13 +29,12 @@ print_error() {
     echo -e "${RED}ERROR:${NC} ${error_str}"
 }
 
-ping -c 1 "www.google.fr" > /dev/null 2>&1
+ping -c 1 -W 5 "www.google.com" > /dev/null 2>&1
 if [ $? -ne 0 ]; then
-    print_error "no network connection. Connect to internet and rerun the script."
+    print_error "no network connection detected. Connect to internet and rerun the script."
     echo
     exit 1
 fi
-
 
 # check if some snap packages could be updated manually (before default automatic snap updates)
 # example:

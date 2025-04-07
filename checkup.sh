@@ -84,9 +84,10 @@ print_error() {
 
 if ! [ -d "${CHECKUP_FOLDER}" ]; then
     echo
-    print_warning "checkup folder ${CHECKUP_FOLDER} does not exist, create it to fully benefit from the potential of this script."
+    print_warning "checkup folder ${CHECKUP_FOLDER} does not exist. Create it to fully benefit from the potential of this script."
     echo "This folder contains files and command results. They shall be saved manually by the user, as defined in this script."
-    echo "Then they will be checked for change at each script execution, which will allow to be aware of any change related to the safety or health of ubuntu."
+    echo "Then they will be checked for changes at each script execution, ensuring nothing critical has changed in the safety"
+    echo "and health of the Ubuntu installation."
 fi
 
 echo
@@ -96,7 +97,8 @@ echo
 # Check that password is requested for sudo commands
 if [ ${TEST_SUDO_PWD} -eq 1 ]; then
     sudo -k
-    if sudo -n true > /dev/null 2>&1; then
+    sudo -n true 2> /dev/null
+    if [ $? -eq 0 ]; then
         print_error "sudo without password"
     else
         print_success "sudo password"
@@ -109,13 +111,11 @@ echo
 echo "---------- Check network connections ----------"
 echo
 
-ping -c 1 "www.google.fr" > /dev/null 2>&1
+ping -c 1 -W 5 "www.google.com" > /dev/null 2>&1
 if [ $? -eq 0 ]; then
     print_success "network connection available"
 else
-    print_error "no network connection. Connect to internet and rerun the script."
-    echo
-    exit 1
+    print_error "no network connection detected"
 fi
 
 wireless_sw_status=$(rfkill list)
@@ -576,28 +576,26 @@ fi
 apt_list_installed=$(apt list --installed 2> /dev/null)
 nb_packages_installed=$(echo "${apt_list_installed}" | wc -l)
 
+# known unsafe packages
 if echo "${apt_list_installed}" | grep -q "^vino"; then
     print_error "vino is installed (security risk)"
 fi
-
 if echo "${apt_list_installed}" | grep -q "^wine"; then
     print_error "wine is installed (security risk)"
 fi
-
 if echo "${apt_list_installed}" | grep -q "chrome"; then
     print_error "chrome is installed (snap chromium shall be preferred because open source)"
 fi
-
-# in ubuntu, snap is used by default instead of flatpak
-if echo "${apt_list_installed}" | grep -q "flatpak"; then
-    print_error "flatpak is installed (snap shall be preferred on ubuntu)"
-fi
-
 if command -v kwallet-query &> /dev/null; then
     kde_wallet_unused=$(kwallet-query kdewallet -l 2> /dev/null | grep "The folder Passwords does not exist")
     if [ -z "${kde_wallet_unused}" ]; then
         print_warning "KDE wallet is used"
     fi
+fi
+
+# in ubuntu, snap is used by default instead of flatpak
+if echo "${apt_list_installed}" | grep -q "flatpak"; then
+    print_error "flatpak is installed (snap shall be preferred on ubuntu)"
 fi
 
 apt_cache_policy_all_packages=$(apt-cache policy $(dpkg-query -W -f='${binary:Package}\n'))
@@ -624,15 +622,7 @@ if [ -n "$backports_packages" ]; then
     print_error "backports packages are installed"
 fi
 
-# obsolete packages in ubuntu 24.10:
-# libcanberra-gtk3-0t64/now 0.30-10ubuntu10 amd64 [installed,local]
-# linux-headers-6.8.0-48-generic/now 6.8.0-48.48 amd64 [installed,local]
-# linux-headers-6.8.0-48/now 6.8.0-48.48 all [installed,local]
-# linux-image-6.8.0-48-generic/now 6.8.0-48.48 amd64 [installed,local]
-# linux-modules-6.8.0-48-generic/now 6.8.0-48.48 amd64 [installed,local]
-# linux-modules-extra-6.8.0-48-generic/now 6.8.0-48.48 amd64 [installed,local]
-# linux-tools-6.8.0-48-generic/now 6.8.0-48.48 amd64 [installed,local]
-# linux-tools-6.8.0-48/now 6.8.0-48.48 amd64 [installed,local]
+# obsolete packages
 obsolete_packages=$(apt list ~o 2> /dev/null | grep -v "Listing...")
 if [ -n "$obsolete_packages" ]; then
     echo "$obsolete_packages"
@@ -645,9 +635,9 @@ if [ -n "$possibly_useless_packages" ]; then
     print_warning "above packages may be useless ('sudo apt autoremove [--dry-run] --purge' to be run to remove them all)"
 fi
 
+# Check snap packages
 echo
 echo "checking snap packages..."
-# Check snap packages
 snap_error_found=0
 if [ -f "${CHECKUP_FOLDER}/snap_list_sauv.txt" ]; then
     # option --all of snap list is not used here because package revisions order is undeterministic
@@ -725,8 +715,7 @@ if [ ${snap_error_found} -eq 0 ]; then
   print_success "snap packages"
 fi
 
-# detected package in ubuntu 24.10:
-# non-official! no URL! non-authenticated! error for package wireless-tools
+# Check installed packages in details
 echo
 echo "checking installed packages in details..."
 packages_with_updates_disabled=$(apt-mark showhold)
