@@ -84,9 +84,10 @@ print_error() {
 
 if ! [ -d "${CHECKUP_FOLDER}" ]; then
     echo
-    print_warning "checkup folder ${CHECKUP_FOLDER} does not exist. Create it to fully benefit from the potential of this script."
+    print_warning "checkup folder ${CHECKUP_FOLDER} does not exist."
+    echo "Create it to fully benefit from the potential of this script."
     echo "This folder contains files and command results. They shall be saved manually by the user, as defined in this script."
-    echo "Then they will be checked for changes at each script execution, ensuring nothing critical has changed in the safety"
+    echo "They will then be checked for changes at each script execution, ensuring nothing critical has changed in the safety"
     echo "and health of the Ubuntu installation."
 fi
 
