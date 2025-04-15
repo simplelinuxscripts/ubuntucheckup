@@ -348,6 +348,18 @@ else
     print_warning "startup services check is skipped because reference file ${CHECKUP_FOLDER}/.config/autostart does not exist"
 fi
 
+# Check critical errors in logs
+today_date=$(date +"%Y-%m-%d")
+one_day_ago_date=$(date -d "yesterday" +"%Y-%m-%d")
+two_days_ago_date=$(date -d "2 days ago" +"%Y-%m-%d")
+critical_errors_in_logs=$(more /var/log/syslog | grep -iP "$today_date|$one_day_ago_date|$two_days_ago_date" | grep -iP "severe|critical|fatal" | grep -iv "not severe" | grep -iv "not critical" | grep -iv "not fatal")
+if [ "${critical_errors_in_logs}" == "" ]; then
+    print_success "recent logs"
+else
+    echo "$critical_errors_in_logs"
+    print_error "recent critical errors in logs"
+fi
+
 # Check PATH
 if [ "$PATH" == "$EXPECTED_PATH" ]; then
     print_success "PATH environment variable"
