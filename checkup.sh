@@ -348,16 +348,19 @@ else
     print_warning "startup services check is skipped because reference file ${CHECKUP_FOLDER}/.config/autostart does not exist"
 fi
 
-# Check errors in logs
+# Check errors in system logs
 today_date=$(date +"%Y-%m-%d")
 one_day_ago_date=$(date -d "yesterday" +"%Y-%m-%d")
 two_days_ago_date=$(date -d "2 days ago" +"%Y-%m-%d")
-serious_errors_in_logs=$(more /var/log/syslog /var/log/kern.log /var/log/auth.log | grep -iP "$today_date|$one_day_ago_date|$two_days_ago_date" | grep -iP "severe|critical|fatal|alert|emergency|panic|segfault" | grep -iv "not severe" | grep -iv "not critical" | grep -iv "not fatal")
-if [ "${serious_errors_in_logs}" == "" ]; then
-    print_success "recent logs"
+serious_errors_in_system_logs=$(more /var/log/syslog /var/log/kern.log /var/log/auth.log | grep -iP "$today_date|$one_day_ago_date|$two_days_ago_date" | grep -iP "severe|critical|fatal|alert|emergency|panic|segfault" | grep -iv "not severe" | grep -iv "not critical" | grep -iv "not fatal")
+if [ "${serious_errors_in_system_logs}" == "" ]; then
+    print_success "system logs"
 else
-    echo "$serious_errors_in_logs"
-    print_warning "errors were found in recent logs"
+    echo "$serious_errors_in_system_logs"
+    print_warning "above errors were found in system logs"
+fi
+if ! [[ -e /var/log/syslog && -e /var/log/kern.log && -e /var/log/auth.log ]]; then # same list of files as above
+    print_warning "some system logs files to be checked were missing"
 fi
 
 # Check PATH
