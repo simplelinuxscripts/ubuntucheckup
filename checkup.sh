@@ -352,10 +352,15 @@ fi
 today_date=$(date +"%Y-%m-%d")
 one_day_ago_date=$(date -d "yesterday" +"%Y-%m-%d")
 two_days_ago_date=$(date -d "2 days ago" +"%Y-%m-%d")
+three_days_ago_date=$(date -d "3 days ago" +"%Y-%m-%d")
+four_days_ago_date=$(date -d "4 days ago" +"%Y-%m-%d")
+five_days_ago_date=$(date -d "5 days ago" +"%Y-%m-%d")
+six_days_ago_date=$(date -d "6 days ago" +"%Y-%m-%d")
+seven_days_ago_date=$(date -d "7 days ago" +"%Y-%m-%d")
 if ! [[ -e /var/log/syslog && -e /var/log/kern.log && -e /var/log/auth.log ]]; then # same list of files as below
     print_warning "some system logs files to be checked are missing"
 fi
-serious_errors_in_system_logs=$(more /var/log/syslog /var/log/kern.log /var/log/auth.log | grep -iP "$today_date|$one_day_ago_date|$two_days_ago_date" | grep -iP "severe|critical|fatal|alert|emergency|panic|segfault" | grep -iv "not severe" | grep -iv "not critical" | grep -iv "not fatal")
+serious_errors_in_system_logs=$(more /var/log/syslog /var/log/kern.log /var/log/auth.log | grep -iP "$today_date|$one_day_ago_date|$two_days_ago_date|$three_days_ago_date|$four_days_ago_date|$five_days_ago_date|$six_days_ago_date|$seven_days_ago_date" | grep -iP "severe|critical|fatal|alert|emergency|panic|segfault" | grep -iv "not severe" | grep -iv "not critical" | grep -iv "not fatal")
 if [ "${serious_errors_in_system_logs}" == "" ]; then
     print_success "system logs"
 else
@@ -784,7 +789,11 @@ if [ ${nb_errors} -eq 0 ]; then
         echo -e "*** DONE ${YELLOW}with ${nb_warnings} warning(s)${NC} ***"
     fi
 else
-    echo -e "*** DONE ${RED}with ${nb_errors} errors(s)${NC} ***"
+    if [ ${nb_warnings} -eq 0 ]; then
+        echo -e "*** DONE ${RED}with ${nb_errors} errors(s)${NC} ***"
+    else
+        echo -e "*** DONE ${RED}with ${nb_errors} errors(s)${NC} + ${YELLOW}with ${nb_warnings} warning(s)${NC} ***"
+    fi
 fi
 
 echo
