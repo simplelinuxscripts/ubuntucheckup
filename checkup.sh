@@ -62,10 +62,15 @@ print_success() {
     echo -e "${GREEN}CHECKED${NC} ${success_str}"
 }
 
+print_info() {
+    info_str="$1"
+    echo "Info: ${info_str}"
+}
+
 nb_warnings=0
 print_warning() {
-    nb_warnings=$((nb_warnings+1))
     warning_str="$1"
+    nb_warnings=$((nb_warnings+1))
     echo -e "${YELLOW}Warning:${NC} ${warning_str}"
     if [ ${STOP_ON_WARNINGS} -eq 1 ]; then
         read -p "Press Enter to ignore..."
@@ -74,8 +79,8 @@ print_warning() {
 
 nb_errors=0
 print_error() {
-    nb_errors=$((nb_errors+1))
     error_str="$1"
+    nb_errors=$((nb_errors+1))
     echo -e "${RED}ERROR:${NC} ${error_str}"
     if [ ${STOP_ON_ERRORS} -eq 1 ]; then
         read -p "Press Enter to ignore..."
@@ -348,6 +353,15 @@ else
     print_warning "startup services check is skipped because reference file ${CHECKUP_FOLDER}/.config/autostart does not exist"
 fi
 
+# Check PATH
+if [ "$PATH" == "$EXPECTED_PATH" ]; then
+    print_success "PATH environment variable"
+else
+    echo "expected PATH: $EXPECTED_PATH"
+    echo "current PATH:  $PATH"
+    print_error "PATH environment variable has changed"
+fi
+
 # Check errors in system logs
 today_date=$(date +"%Y-%m-%d")
 one_day_ago_date=$(date -d "yesterday" +"%Y-%m-%d")
@@ -366,15 +380,6 @@ if [ "${serious_errors_in_system_logs}" == "" ]; then
 else
     echo "$serious_errors_in_system_logs"
     print_warning "above errors were found in system logs"
-fi
-
-# Check PATH
-if [ "$PATH" == "$EXPECTED_PATH" ]; then
-    print_success "PATH environment variable"
-else
-    echo "expected PATH: $EXPECTED_PATH"
-    echo "current PATH:  $PATH"
-    print_error "PATH environment variable has changed"
 fi
 
 echo
@@ -762,7 +767,15 @@ for pkg in $(dpkg-query -W -f='${binary:Package}\n'); do
         package_errors_str="non-official! ${package_errors_str}"
     fi
     if [ -n "${package_errors_str}" ]; then
-        print_error "${package_errors_str}error for package ${pkg}"
+        # Handle exceptions like:
+        # linux-image-6.11.0-9-generic
+        # linux-modules-6.11.0-9-generic
+        # linux-modules-extra-6.11.0-9-generic
+        if [[ ${pkg} == *"linux-image-"* || ${pkg} == *"linux-modules-"* ]]; then
+            print_info "${package_errors_str}for package ${pkg}"
+        else
+            print_error "${package_errors_str}for package ${pkg}"
+        fi
     fi
 
     # PPA (Personal Package Archive) packages (e.g. http://ppa.xxx) not available in official ubuntu repositories
