@@ -374,7 +374,7 @@ seven_days_ago_date=$(date -d "7 days ago" +"%Y-%m-%d")
 if ! [[ -e /var/log/syslog && -e /var/log/kern.log && -e /var/log/auth.log ]]; then # same list of files as below
     print_warning "some system logs files to be checked are missing"
 fi
-serious_errors_in_system_logs=$(more /var/log/syslog /var/log/kern.log /var/log/auth.log | grep -iP "$today_date|$one_day_ago_date|$two_days_ago_date|$three_days_ago_date|$four_days_ago_date|$five_days_ago_date|$six_days_ago_date|$seven_days_ago_date" | grep -iP "severe|critical|fatal|alert|emergency|panic|segfault" | grep -iv "not severe" | grep -iv "not critical" | grep -iv "not fatal")
+serious_errors_in_system_logs=$(more /var/log/syslog /var/log/kern.log /var/log/auth.log | grep -iP "$today_date|$one_day_ago_date|$two_days_ago_date|$three_days_ago_date|$four_days_ago_date|$five_days_ago_date|$six_days_ago_date|$seven_days_ago_date" | grep -iv "not severe" | grep -iv "not critical" | grep -iv "not fatal" | grep -iP --color=always "severe|critical|fatal|alert|emergency|panic|segfault")
 if [ "${serious_errors_in_system_logs}" == "" ]; then
     print_success "system logs"
 else
