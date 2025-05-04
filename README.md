@@ -15,4 +15,4 @@ Then running this script regularly will ensure nothing critical has changed or h
 \- example with no issue detected:  
 ![example_1](https://github.com/user-attachments/assets/1814e6c6-e930-49aa-a019-86b3729e2cbe)  
 \- example with issues detected:  
-![example_2](https://github.com/user-attachments/assets/8e90877e-4974-4e7a-822a-cd1a86904fe4)  
+![example_2](https://github.com/user-attachments/assets/70e3fc95-c62a-4c7c-8691-fbf57160af3c)  
