@@ -119,14 +119,15 @@ echo
 
 ping -c 1 -W 5 "www.google.com" > /dev/null 2>&1
 if [ $? -eq 0 ]; then
-    print_success "network connection available"
+    print_success "network connection"
 else
     print_error "no network connection detected"
 fi
 
+# Check wireless connections (wifi, bluetooth)
 wireless_sw_status=$(rfkill list)
 if ! $(echo "${wireless_sw_status}" | grep -q "Soft blocked: no"); then
-    print_success "wireless connections disabled"
+    print_success "wireless connections"
 else
     echo "${wireless_sw_status}"
     print_warning "wireless connection(s) enabled"
@@ -141,36 +142,36 @@ ufw_status=$(sudo ufw status verbose)
 ufw_status_1=$(echo "${ufw_status}" | grep -o "Status: active")
 if [ "$ufw_status_1" == "Status: active" ]; then
     print_success "ufw enabled"
+
+    ufw_status_2=$(echo "${ufw_status}" | grep -o "deny (incoming)")
+    if [ "$ufw_status_2" == "deny (incoming)" ]; then
+        print_success "ufw incoming traffic denied"
+    else
+        print_error "ufw incoming traffic is not denied"
+    fi
+
+    ufw_status_3=$(echo "${ufw_status}" | grep -o "allow (outgoing)")
+    if [ "$ufw_status_3" == "allow (outgoing)" ]; then
+        print_success "ufw outgoing traffic allowed"
+    else
+        print_error "ufw outgoing traffic is not allowed"
+    fi
+
+    ufw_status_4=$(echo "${ufw_status}" | grep -o "disabled (routed)")
+    if [ "$ufw_status_4" == "disabled (routed)" ]; then
+        print_success "ufw routed traffic disabled"
+    else
+        print_error "ufw routed traffic is not disabled"
+    fi
+
+    ufw_status_5=$(echo "${ufw_status}" |  grep -o "Logging: on (low)")
+    if [ "$ufw_status_5" == "Logging: on (low)" ]; then
+        print_success "ufw logging"
+    else
+        print_warning "ufw logging is not on+low"
+    fi
 else
     print_error "ufw disabled ('sudo ufw enable' to be run)"
-fi
-
-ufw_status_2=$(echo "${ufw_status}" | grep -o "deny (incoming)")
-if [ "$ufw_status_2" == "deny (incoming)" ]; then
-    print_success "ufw incoming traffic denied"
-else
-    print_error "ufw incoming traffic is not denied"
-fi
-
-ufw_status_3=$(echo "${ufw_status}" | grep -o "allow (outgoing)")
-if [ "$ufw_status_3" == "allow (outgoing)" ]; then
-    print_success "ufw outgoing traffic allowed"
-else
-    print_error "ufw outgoing traffic is not allowed"
-fi
-
-ufw_status_4=$(echo "${ufw_status}" | grep -o "disabled (routed)")
-if [ "$ufw_status_4" == "disabled (routed)" ]; then
-    print_success "ufw routed traffic disabled"
-else
-    print_error "ufw routed traffic is not disabled"
-fi
-
-ufw_status_5=$(echo "${ufw_status}" |  grep -o "Logging: on (low)")
-if [ "$ufw_status_5" == "Logging: on (low)" ]; then
-    print_success "ufw logging on low"
-else
-    print_warning "ufw logging is not on+low"
 fi
 
 echo
@@ -279,7 +280,7 @@ if [ -z "${ubuntu_wayland_sessions}" ]; then
 elif ! [ "$XDG_SESSION_TYPE" == "wayland" ]; then
     print_error "wayland session type was not selected in login screen ($XDG_SESSION_TYPE)"
 else
-    print_success "wayland session type used"
+    print_success "wayland session"
 fi
 # Check that at least one ubuntu xsession is available (useful as a backup session in case of issues with desktops other than gnome)
 ubuntu_xsessions=$(ls /usr/share/xsessions/ | grep -E "ubuntu.*\.desktop") # example of ls /usr/share/xsessions/ output: plasmax11.desktop  ubuntu-xorg.desktop  ubuntu.desktop
@@ -292,6 +293,34 @@ fi
 echo
 echo "---------- Check install ----------"
 echo
+
+if [ -d "${CHECKUP_FOLDER}" ]; then
+    error_found=0
+    diff "${CHECKUP_FOLDER}/etc/apt/sources.list" "/etc/apt/sources.list"
+    if [ $? -ne 0 ]; then
+        print_error "repository list has changed (/etc/apt/sources.list)"
+        error_found=1
+    fi
+
+    diff -r --exclude="*.save" "${CHECKUP_FOLDER}/etc/apt/sources.list.d" "/etc/apt/sources.list.d"
+    if [ $? -ne 0 ]; then
+        print_error "repository list has changed (/etc/apt/sources.list.d)"
+        error_found=1
+    fi
+
+    apt-cache policy > "${CHECKUP_FOLDER}/apt-cache_policy_current.txt"
+    diff "${CHECKUP_FOLDER}/apt-cache_policy_sauv.txt" "${CHECKUP_FOLDER}/apt-cache_policy_current.txt"
+    if [ $? -ne 0 ]; then
+        print_error "repository list has changed (apt-cache policy)"
+        error_found=1
+    fi
+
+    if [ ${error_found} -eq 0 ]; then
+        print_success "repository list"
+    fi
+else
+    print_warning "repository list check is skipped because reference folder ${CHECKUP_FOLDER} does not exist"
+fi
 
 customized_file_1="/etc/apt/apt.conf.d/10periodic" # file customized via Software & Updates / Updates tab
 software_update_rate=$(cat "${customized_file_1}" | grep -E "Update-Package-Lists.*\"1\";")
@@ -383,6 +412,14 @@ else
 fi
 
 echo
+sudo apt-get check > /dev/null
+if [ $? -eq 0 ]; then
+    print_success "apt-get check"
+else
+    print_error "apt-get check"
+fi
+
+echo
 # Check firefox
 if [ -d "${SNAP_FIREFOX_PROFILE_FOLDER}" ]; then
     error_found=0
@@ -395,7 +432,7 @@ if [ -d "${SNAP_FIREFOX_PROFILE_FOLDER}" ]; then
     fi
     firefox_httpsonly_setting=$(cat ${SNAP_FIREFOX_PROFILE_FOLDER}/prefs.js | grep "user_pref(\"dom.security.https_only_mode\", true);")
     if [ -z "${firefox_httpsonly_setting}" ]; then
-        print_error "firefox https only setting is disabled"
+        print_error "firefox HTTPS-only setting is disabled"
         error_found=1
     fi
     firefox_autofillcard_setting=$(cat ${SNAP_FIREFOX_PROFILE_FOLDER}/prefs.js | grep "user_pref(\"extensions.formautofill.creditCards.enabled\", false);")
@@ -551,52 +588,16 @@ else
     print_error "chromium extensions check is skipped because chromium snap folder ${SNAP_FOLDER}/chromium does not exist"
 fi
 
-# Check installed package files storage
+# Check package files storage
 echo
-echo "checking installed package files storage..."
+echo "checking package files storage..."
 # possible error observed at sudo dpkg --verify execution: ??5?????? c /etc/apt/apt.conf.d/10periodic (means that properties in this file don't match the package's expectations, typically following customization via Software & Updates / Updates tab) => ignored because /etc/apt/apt.conf.d/10periodic file contents were already checked above
 dpkg_verify_status=$(sudo dpkg --verify | grep -v "/etc/apt/apt.conf.d/10periodic")
 if [ -n "${dpkg_verify_status}" ]; then
     echo "${dpkg_verify_status}"
-    print_error "errors in installed package files storage, possibly due to manual updates, file corruptions, file system errors on disk, see above (package reinstallation or package file restoration may be needed)"
+    print_error "errors in package files storage, possibly due to manual updates, file corruptions, file system errors on disk, see above (package reinstallation or package file restoration may be needed)"
 else
-    print_success "installed package files storage"
-fi
-
-echo
-sudo apt-get check > /dev/null
-if [ $? -eq 0 ]; then
-    print_success "apt-get check"
-else
-    print_error "apt-get check"
-fi
-
-if [ -d "${CHECKUP_FOLDER}" ]; then
-    error_found=0
-    diff "${CHECKUP_FOLDER}/etc/apt/sources.list" "/etc/apt/sources.list"
-    if [ $? -ne 0 ]; then
-        print_error "repository list has changed (/etc/apt/sources.list)"
-        error_found=1
-    fi
-
-    diff -r --exclude="*.save" "${CHECKUP_FOLDER}/etc/apt/sources.list.d" "/etc/apt/sources.list.d"
-    if [ $? -ne 0 ]; then
-        print_error "repository list has changed (/etc/apt/sources.list.d)"
-        error_found=1
-    fi
-
-    apt-cache policy > "${CHECKUP_FOLDER}/apt-cache_policy_current.txt"
-    diff "${CHECKUP_FOLDER}/apt-cache_policy_sauv.txt" "${CHECKUP_FOLDER}/apt-cache_policy_current.txt"
-    if [ $? -ne 0 ]; then
-        print_error "repository list has changed (apt-cache policy)"
-        error_found=1
-    fi
-
-    if [ ${error_found} -eq 0 ]; then
-        print_success "repository list"
-    fi
-else
-    print_warning "repository list check is skipped because reference folder ${CHECKUP_FOLDER} does not exist"
+    print_success "package files storage"
 fi
 
 apt_list_installed=$(apt list --installed 2> /dev/null)
@@ -792,7 +793,7 @@ for pkg in $(dpkg-query -W -f='${binary:Package}\n'); do
     fi
     package_index=$((package_index+1))
 done
-print_success "installed packages, see above logs for any warnings/errors"
+print_success "installed packages (see above logs for any warnings/errors)"
 
 echo
 if [ ${nb_errors} -eq 0 ]; then
