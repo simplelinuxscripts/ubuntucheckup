@@ -577,7 +577,7 @@ fi
 # Chromium extensions
 if [ -d "${SNAP_FOLDER}/chromium" ]; then
     # snap chromium extensions are located in ~/snap/chromium/.../Extensions
-    chromium_extension_files=$(find ${SNAP_FOLDER}/chromium -type f -ipath "*Extensions*")
+    chromium_extension_files=$(find ${SNAP_FOLDER}/chromium -type f -path "*Extensions*")
     if [ -n "${chromium_extension_files}" ]; then
         echo "${chromium_extension_files}"
         print_warning "chromium extensions were found, see above"
