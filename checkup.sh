@@ -212,6 +212,12 @@ else
     error_found=1
   fi
 fi
+# Check apparmor namespace creation restrictions
+apparmor_restrict_unprivileged_userns=$(sysctl kernel.apparmor_restrict_unprivileged_userns)
+if ! [ "$apparmor_restrict_unprivileged_userns" == "kernel.apparmor_restrict_unprivileged_userns = 1" ]; then
+    print_error "unprivileged users can create user namespaces"
+    error_found=1
+fi
 # Check unsafe apparmor processes 1/2
 if [ "${nb_apparmor_prompt_processes}" == "" ] || [ ${nb_apparmor_prompt_processes} -ne 0 ]; then
   print_warning "apparmor processes in prompt mode (${nb_apparmor_prompt_processes})"
