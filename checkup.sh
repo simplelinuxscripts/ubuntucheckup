@@ -300,14 +300,14 @@ echo
 echo "---------- Check install ----------"
 echo
 
+error_found=0
 unexpected_repo_urls=$(apt-cache policy | grep -oE '\bhttp[^ ]+' | grep -v 'http://security.ubuntu.com/ubuntu' | grep -v 'http://archive.ubuntu.com/ubuntu')
 if [ -n "${unexpected_repo_urls}" ]; then
     echo "${unexpected_repo_urls}"
     print_error "above repository URLs are unexpected"
+    error_found=1
 fi
-
 if [ -d "${CHECKUP_FOLDER}" ]; then
-    error_found=0
     diff "${CHECKUP_FOLDER}/etc/apt/sources.list" "/etc/apt/sources.list"
     if [ $? -ne 0 ]; then
         print_error "repository list has changed (/etc/apt/sources.list)"
