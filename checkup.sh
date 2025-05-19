@@ -394,13 +394,26 @@ else
     print_warning "startup services check is skipped because reference file ${CHECKUP_FOLDER}/.config/autostart does not exist"
 fi
 
-# Check PATH
+# Check PATH environment variable
 if [ "$PATH" == "$EXPECTED_PATH" ]; then
     print_success "PATH environment variable"
 else
     echo "expected PATH: $EXPECTED_PATH"
     echo "current PATH:  $PATH"
     print_error "PATH environment variable has changed"
+fi
+# Check if /usr/local/sbin and /usr/local/bin are empty (adapt if legitimate local files are in those folders)
+# This check is particularly useful if those folders are at the start of PATH environment variable,
+# for security reasons as they take precedence over system-installed programs
+file_list=$(ls -A "/usr/local/sbin")
+if ! [ -z "$file_list" ]; then
+    echo $file_list
+    print_warning "above files are present in /usr/local/sbin"
+fi
+file_list=$(ls -A "/usr/local/bin")
+if ! [ -z "$file_list" ]; then
+    echo $file_list
+    print_warning "above files are present in /usr/local/bin"
 fi
 
 # Check errors in system logs
