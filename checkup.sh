@@ -414,7 +414,7 @@ fi
 file_list=$(ls -A "/usr/local/bin")
 if ! [ -z "$file_list" ]; then
     echo $file_list
-    print_warning "/usr/local/bin contains above local/manually-installed program(s)"
+    print_error "/usr/local/bin contains above local/manually-installed program(s)"
 fi
 
 # Check errors in system logs
