@@ -402,18 +402,19 @@ else
     echo "current PATH:  $PATH"
     print_error "PATH environment variable has changed"
 fi
-# Check if /usr/local/sbin and /usr/local/bin are empty (adapt if legitimate local files are in those folders)
-# This check is particularly useful if those folders are at the start of PATH environment variable,
-# for security reasons as they take precedence over system-installed programs
+# Check if /usr/local/sbin and /usr/local/bin folders contain files.
+# This check is particularly useful if those folders are at the start of PATH environment variable before /usr/sbin and /usr/bin,
+# for security reasons, as they take precedence over programs installed by the system's package manager
+# (adapt this check if some local files are legitimate).
 file_list=$(ls -A "/usr/local/sbin")
 if ! [ -z "$file_list" ]; then
     echo $file_list
-    print_warning "above files are present in /usr/local/sbin"
+    print_error "/usr/local/sbin contains above local/manually-installed program(s)"
 fi
 file_list=$(ls -A "/usr/local/bin")
 if ! [ -z "$file_list" ]; then
     echo $file_list
-    print_warning "above files are present in /usr/local/bin"
+    print_warning "/usr/local/bin contains above local/manually-installed program(s)"
 fi
 
 # Check errors in system logs
