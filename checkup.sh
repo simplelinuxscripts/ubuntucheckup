@@ -310,20 +310,20 @@ fi
 if [ -d "${CHECKUP_FOLDER}" ]; then
     diff "${CHECKUP_FOLDER}/etc/apt/sources.list" "/etc/apt/sources.list"
     if [ $? -ne 0 ]; then
-        print_error "repository list has changed (/etc/apt/sources.list)"
+        print_error "repository list has changed in /etc/apt/sources.list"
         error_found=1
     fi
 
-    diff -r --exclude="*.save" "${CHECKUP_FOLDER}/etc/apt/sources.list.d" "/etc/apt/sources.list.d"
+    diff -rU 0 --exclude="*.save" "${CHECKUP_FOLDER}/etc/apt/sources.list.d" "/etc/apt/sources.list.d"
     if [ $? -ne 0 ]; then
-        print_error "repository list has changed (/etc/apt/sources.list.d)"
+        print_error "repository list has changed in /etc/apt/sources.list.d (check changes and copy folder /etc/apt/sources.list.d to ${CHECKUP_FOLDER}/etc/apt/sources.list.d)"
         error_found=1
     fi
 
     apt-cache policy > "${CHECKUP_FOLDER}/apt-cache_policy_current.txt"
     diff "${CHECKUP_FOLDER}/apt-cache_policy_sauv.txt" "${CHECKUP_FOLDER}/apt-cache_policy_current.txt"
     if [ $? -ne 0 ]; then
-        print_error "repository list has changed (apt-cache policy)"
+        print_error "repository list has changed for apt-cache policy (check changes and copy file ${CHECKUP_FOLDER}/apt-cache_policy_current.txt to ${CHECKUP_FOLDER}/apt-cache_policy_sauv.txt)"
         error_found=1
     fi
 
@@ -366,7 +366,7 @@ fi
 # Check startup applications and services
 if [ -d "${CHECKUP_FOLDER}/.config/autostart" ]; then
     error_found=0
-    diff -r "${CHECKUP_FOLDER}/.config/autostart" "${HOME}/.config/autostart/"
+    diff -rU 0 "${CHECKUP_FOLDER}/.config/autostart" "${HOME}/.config/autostart/"
     if [ $? -ne 0 ]; then
         print_error "startup applications have changed (${HOME}/.config/autostart)"
         error_found=1
@@ -617,8 +617,12 @@ fi
 # Check package files storage
 echo
 echo "checking package files storage..."
-# possible error observed at sudo dpkg --verify execution: ??5?????? c /etc/apt/apt.conf.d/10periodic (means that properties in this file don't match the package's expectations, typically following customization via Software & Updates / Updates tab) => ignored because /etc/apt/apt.conf.d/10periodic file contents were already checked above
-dpkg_verify_status=$(sudo dpkg --verify | grep -v "/etc/apt/apt.conf.d/10periodic")
+# - Possible error observed at sudo dpkg --verify execution: ??5?????? c /etc/apt/apt.conf.d/10periodic (means that properties in this file don't match the package's expectations, typically following customization via Software & Updates / Updates tab) => ignored because /etc/apt/apt.conf.d/10periodic file contents were already checked above
+# - Errors like "missing     /usr/share/icons/LoginIcons" can be corrected by:
+# 1) dpkg -S /usr/share/icons/LoginIcons => package name is displayed like "ubuntu-mono: /usr/share/icons/LoginIcons"
+# 2) sudo apt reinstall ubuntu-mono => this command reinstalls the faulty package
+# - When errors cannot be avoided for some files, grep -v is piped to below command
+dpkg_verify_status=$(sudo dpkg --verify | grep -v "/etc/apt/apt.conf.d/10periodic" | grep -v "/etc/cloud/templates/sources.list.debian.deb822.tmpl" | grep -v "/etc/cloud/templates/sources.list.ubuntu.deb822.tmpl" | grep -v "/etc/xdg/libkleopatrarc" )
 if [ -n "${dpkg_verify_status}" ]; then
     echo "${dpkg_verify_status}"
     print_error "errors in package files storage, possibly due to manual updates, file corruptions, file system errors on disk, see above (package reinstallation or package file restoration may be needed)"
@@ -679,7 +683,7 @@ fi
 obsolete_packages=$(apt list ~o 2> /dev/null | grep -v "Listing...")
 if [ -n "$obsolete_packages" ]; then
     echo "$obsolete_packages"
-    print_warning "above packages are obsolete ('sudo apt remove' + 'sudo apt purge' to be run)"
+    print_warning "above packages are obsolete ('sudo apt remove --purge packagename' to be run)"
 fi
 
 possibly_useless_packages=$(apt autoremove --dry-run 2> /dev/null | grep -P "(REMOV|Remv)")
@@ -705,7 +709,7 @@ if [ -f "${CHECKUP_FOLDER}/snap_list_sauv.txt" ]; then
     fi
     diff "${CHECKUP_FOLDER}/snap_list_sauv_reformated.txt" "${CHECKUP_FOLDER}/snap_list_current_reformated.txt"
     if [ $? -ne 0 ]; then
-        print_error "snap package list has changed"
+        print_error "snap package list has changed (check changes and copy file ${CHECKUP_FOLDER}/snap_list_current.txt to ${CHECKUP_FOLDER}/snap_list_sauv.txt)"
         snap_error_found=1
     fi
 else
@@ -794,12 +798,15 @@ for pkg in $(dpkg-query -W -f='${binary:Package}\n'); do
         package_errors_str="non-official! ${package_errors_str}"
     fi
     if [ -n "${package_errors_str}" ]; then
-        # Handle exceptions like:
-        # linux-image-6.11.0-9-generic
-        # linux-modules-6.11.0-9-generic
-        # linux-modules-extra-6.11.0-9-generic
-        if [[ ${pkg} == *"linux-image-"* || ${pkg} == *"linux-modules-"* ]]; then
-            print_info "${package_errors_str}for package ${pkg}"
+        # Handle virtual packages like:
+        # linux-image-*-generic
+        # linux-modules-*-generic
+        # linux-modules-extra-*-generic ...
+        virtual_package=$(apt show "${pkg}" 2> /dev/null)
+        virtual_package_status=$(echo "${virtual_package}" | grep "State: not a real package (virtual)")
+        not_installed_status=$(echo "${pkg_policy}" | grep "Installed: (none)")
+        if [ -n "${virtual_package_status}" ] && [ -n "${not_installed_status}" ]; then
+            print_info "${package_errors_str}for virtual package ${pkg}"
         else
             print_error "${package_errors_str}for package ${pkg}"
         fi
