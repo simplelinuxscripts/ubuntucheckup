@@ -782,6 +782,7 @@ if [ -n "${packages_with_updates_disabled}" ]; then
 fi
 package_index=1
 virtual_packages=""
+nb_virtual_packages=0
 for pkg in $(dpkg-query -W -f='${binary:Package}\n'); do
     pkg_policy=$(apt-cache policy "${pkg}")
     package_errors_str=""
@@ -809,6 +810,7 @@ for pkg in $(dpkg-query -W -f='${binary:Package}\n'); do
         if [ -n "${virtual_package_status}" ] && [ -n "${not_installed_status}" ]; then
             # print_info "${package_errors_str}for virtual package ${pkg}"
             virtual_packages="${virtual_packages} ${pkg}"
+            nb_virtual_packages=$((nb_virtual_packages+1))
         else
             print_error "${package_errors_str}for package ${pkg}"
         fi
@@ -829,7 +831,7 @@ for pkg in $(dpkg-query -W -f='${binary:Package}\n'); do
     package_index=$((package_index+1))
 done
 if ! [ "${virtual_packages}" == "" ]; then
-    print_info "installed virtual packages are ${virtual_packages}"
+    print_info "${nb_virtual_packages} installed virtual package(s):${virtual_packages}"
 fi
 print_success "installed packages (see above logs for any warnings/errors)"
 
