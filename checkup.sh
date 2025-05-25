@@ -12,6 +12,8 @@ export LC_ALL=en_US.UTF-8
 # Parameters
 ############
 
+# Adapt those parameter values as needed depending on your Ubuntu installation
+
 STOP_ON_WARNINGS=0
 STOP_ON_ERRORS=0
 TEST_SUDO_PWD=1
@@ -42,6 +44,9 @@ SNAP_CHROMIUM_FOLDER="${SNAP_FOLDER}/chromium/common/chromium/Default"
 
 # Expected PATH environment variable value (any change of PATH environment variable will be detected)
 EXPECTED_PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games:/usr/local/games:/snap/bin:${HOME}/DOCUMENTS/Informatique/Programmes/Linux:${HOME}/DOCUMENTS/Informatique/Programmes/Linux/simplelinuxscripts/findlines:${HOME}/DOCUMENTS/Informatique/Programmes/Linux/simplelinuxscripts/ubuntucheckup"
+
+# Expected program(s) in /usr/local/bin if any ("" if none)
+EXPECTED_USR_LOCAL_BIN_PROGRAMS="dragon obs"
 
 # Optional: folder used to save a copy of some important configuration files
 #           and therefore be able to regularly check that they were not modified
@@ -411,10 +416,11 @@ if ! [ -z "$file_list" ]; then
     echo $file_list
     print_error "/usr/local/sbin contains above local/manually-installed program(s)"
 fi
-file_list=$(ls -A "/usr/local/bin")
-if ! [ -z "$file_list" ]; then
-    echo $file_list
-    print_error "/usr/local/bin contains above local/manually-installed program(s)"
+file_list=$(ls -A "/usr/local/bin" | tr '\n' ' ')
+file_list="${file_list%"${file_list##*[![:space:]]}"}"
+if ! [ "$file_list" == "$EXPECTED_USR_LOCAL_BIN_PROGRAMS" ]; then
+    echo "$file_list"
+    print_error "/usr/local/bin contains unexpected local/manually-installed program(s) among above ones"
 fi
 
 # Check errors in system logs
