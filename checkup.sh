@@ -781,6 +781,7 @@ if [ -n "${packages_with_updates_disabled}" ]; then
     print_error "above packages have updates disabled ('sudo apt-mark unhold' to be run to enable updates)"
 fi
 package_index=1
+virtual_packages=""
 for pkg in $(dpkg-query -W -f='${binary:Package}\n'); do
     pkg_policy=$(apt-cache policy "${pkg}")
     package_errors_str=""
@@ -806,7 +807,8 @@ for pkg in $(dpkg-query -W -f='${binary:Package}\n'); do
         virtual_package_status=$(echo "${virtual_package}" | grep "State: not a real package (virtual)")
         not_installed_status=$(echo "${pkg_policy}" | grep "Installed: (none)")
         if [ -n "${virtual_package_status}" ] && [ -n "${not_installed_status}" ]; then
-            print_info "${package_errors_str}for virtual package ${pkg}"
+            # print_info "${package_errors_str}for virtual package ${pkg}"
+            virtual_packages="${virtual_packages} ${pkg}"
         else
             print_error "${package_errors_str}for package ${pkg}"
         fi
@@ -826,6 +828,9 @@ for pkg in $(dpkg-query -W -f='${binary:Package}\n'); do
     fi
     package_index=$((package_index+1))
 done
+if ! [ "${virtual_packages}" == "" ]; then
+    print_info "installed virtual packages are ${virtual_packages}"
+fi
 print_success "installed packages (see above logs for any warnings/errors)"
 
 echo
