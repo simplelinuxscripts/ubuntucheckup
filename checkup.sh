@@ -831,7 +831,7 @@ for pkg in $(dpkg-query -W -f='${binary:Package}\n'); do
     package_index=$((package_index+1))
 done
 if ! [ "${virtual_packages}" == "" ]; then
-    print_info "${nb_virtual_packages} installed virtual package(s):${virtual_packages}"
+    print_info "${nb_virtual_packages} virtual package(s):${virtual_packages}"
 fi
 print_success "installed packages (see above logs for any warnings/errors)"
 
