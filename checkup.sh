@@ -46,12 +46,15 @@ SNAP_CHROMIUM_FOLDER="${SNAP_FOLDER}/chromium/common/chromium/Default"
 EXPECTED_PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games:/usr/local/games:/snap/bin:${HOME}/DOCUMENTS/Informatique/Programmes/Linux:${HOME}/DOCUMENTS/Informatique/Programmes/Linux/simplelinuxscripts/findlines:${HOME}/DOCUMENTS/Informatique/Programmes/Linux/simplelinuxscripts/ubuntucheckup"
 
 # Expected program(s) in /usr/local/bin if any ("" if none)
-EXPECTED_USR_LOCAL_BIN_PROGRAMS="dragon obs"
+EXPECTED_USR_LOCAL_BIN_PROGRAMS="dragon gwenview kate obs"
 
 # Optional: folder used to save a copy of some important configuration files
 #           and therefore be able to regularly check that they were not modified
 SCRIPT_FOLDER=$(dirname "$0")
 CHECKUP_FOLDER="${SCRIPT_FOLDER}/checkup_files"
+
+# Extended checks (can be long)
+EXTENDED_CHECKS=0
 
 ########
 # Script
@@ -115,7 +118,7 @@ if [ ${TEST_SUDO_PWD} -eq 1 ]; then
         print_success "sudo password"
     fi
 else
-    print_warning "sudo password check skipped"
+    print_warning "sudo password check is skipped"
 fi
 
 echo
@@ -636,6 +639,62 @@ else
     print_success "package files storage"
 fi
 
+
+echo
+error_found=0
+if [ ${EXTENDED_CHECKS} -eq 0 ]; then
+    echo "checking MD5 checksums for installed packages..."
+    # /lib and /usr/lib not listed because processing can be long
+    find /bin /sbin /usr/bin /usr/sbin -type f -exec md5sum {} \; > /tmp/md5sums
+    while read line; do
+        hash=$(echo "$line" | cut -d' ' -f1)
+        path=$(echo "$line" | cut -d' ' -f2-)
+        filename=$(basename $path | sed 's/\[/\\[/g' | sed 's/\]/\\]/g')
+        if ! grep "$hash" /var/lib/dpkg/info/*.md5sums | grep -q "$filename"; then
+            print_error "MD5 checksum mismatch for $line"
+            error_found=1
+        fi
+    done < /tmp/md5sums
+else
+    # Check all files with an associated MD5 checksum (in addition to above checks done by sudo dpkg --verify). This step can be long.
+    # Can be replaced by "sudo debsums -s" if you installed the debsums package.
+    echo "checking all MD5 checksums for installed packages (can be long)..."
+    first_letter="NA"
+    for md5file in /var/lib/dpkg/info/*.md5sums; do
+        pkgname=$(basename "$md5file" .md5sums)
+        current_first_letter="${pkgname:0:1}"
+        if [[ "$current_first_letter" != "$first_letter" ]]; then
+            echo "- checking /var/lib/dpkg/info/$current_first_letter*.md5sums files..."
+            first_letter=$(echo "$current_first_letter")
+        fi
+
+        while IFS= read -r line; do
+            # Extract expected hash and relative file path
+            expected_hash=$(echo "$line" | cut -d' ' -f1)
+            rel_path=$(echo "$line" | cut -d' ' -f2-)
+            full_path="/${rel_path# }"
+            if [[ -f "$full_path" ]]; then
+                if [[ -r "$full_path" ]]; then
+                    current_hash=$(md5sum "$full_path" | cut -d' ' -f1)
+                    if [[ "$expected_hash" != "$current_hash" ]]; then
+                        print_error "MD5 checksum mismatch for file listed in $md5file: $full_path ($expected_hash != $current_hash)"
+                        error_found=1
+                    fi
+                else
+                    # (above md5sum command was not intended to be called with sudo)
+                    print_info "skipped because unaccessible: file listed in $md5file: $full_path"
+                fi
+            else
+                print_info "missing file listed in $md5file: $full_path"
+            fi
+
+        done < "$md5file"
+    done
+fi
+if [ ${error_found} -eq 0 ]; then
+    print_success "MD5 checksums for installed packages"
+fi
+
 apt_list_installed=$(apt list --installed 2> /dev/null)
 nb_packages_installed=$(echo "${apt_list_installed}" | wc -l)
 
@@ -658,7 +717,7 @@ fi
 
 # in ubuntu, snap is used by default instead of flatpak
 if echo "${apt_list_installed}" | grep -q "flatpak"; then
-    print_error "flatpak is installed (snap shall be preferred on ubuntu)"
+    print_warning "flatpak is installed (snap is preferred to flatpak in Ubuntu)"
 fi
 
 apt_cache_policy_all_packages=$(apt-cache policy $(dpkg-query -W -f='${binary:Package}\n'))

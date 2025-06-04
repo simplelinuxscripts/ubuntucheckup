@@ -4,6 +4,9 @@
 #
 # Ubuntu packages update script
 #
+# USAGE:
+#  update.sh
+#
 ############################
 
 export LC_ALL=en_US.UTF-8
@@ -50,6 +53,12 @@ if [ -n "${snap_packages_that_can_be_updated}" ]; then
 fi
 
 sudo apt update
+if [ $? -ne 0 ]; then
+    # detect errors like GPG key errors, hash sum mismatches...
+    print_error "apt update failed"
+    echo
+    exit 1
+fi
 echo
 
 echo "Packages to upgrade:"
@@ -66,6 +75,11 @@ fi
 echo
 read -p "Press Enter to start upgrades..."
 sudo apt upgrade
+if [ $? -ne 0 ]; then
+    print_error "apt upgrade failed"
+    echo
+    exit 1
+fi
 
 sudo apt-get check
 if [ $? -eq 0 ]; then
