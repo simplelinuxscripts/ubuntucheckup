@@ -4,9 +4,6 @@
 #
 # Ubuntu packages update script
 #
-# USAGE:
-#  update.sh
-#
 ############################
 
 export LC_ALL=en_US.UTF-8
