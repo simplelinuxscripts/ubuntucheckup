@@ -689,7 +689,7 @@ fi
 echo
 error_found=0
 if [ ${EXTENDED_CHECKS} -eq 0 ]; then
-    echo "checking MD5 checksums of main binaries..."
+    echo "checking MD5 checksums..."
 
     # /lib and /usr/lib are not considered because processing can be long (set EXTENDED_CHECKS to 1 to check those folders too)
     find /bin /sbin /usr/bin /usr/sbin -type f -exec md5sum {} \; > /tmp/md5sums
@@ -749,7 +749,7 @@ if [ ${EXTENDED_CHECKS} -eq 0 ]; then
         fi
     done < /tmp/md5sums
     if [ ${error_found} -eq 0 ]; then
-        print_success "MD5 checksums of main binaries"
+        print_success "MD5 checksums"
     fi
 else
     # Check all files with an associated MD5 checksum (in addition to above checks done by sudo dpkg --verify). This step can be long.
