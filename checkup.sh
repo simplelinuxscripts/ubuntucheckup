@@ -644,7 +644,7 @@ echo
 error_found=0
 if [ ${EXTENDED_CHECKS} -eq 0 ]; then
     echo "checking MD5 checksums for installed packages..."
-    # /lib and /usr/lib not listed because processing can be long
+    # /lib and /usr/lib are not considered because processing can be long
     find /bin /sbin /usr/bin /usr/sbin -type f -exec md5sum {} \; > /tmp/md5sums
     while read line; do
         hash=$(echo "$line" | cut -d' ' -f1)
