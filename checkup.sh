@@ -817,7 +817,7 @@ known_suspicious_files=(
 )
 for elt in "${known_suspicious_files[@]}"; do
     if [ -e "$elt" ]; then
-        print_error "Suspicious file or folder found: $elt"
+        print_error "suspicious file or folder found: $elt"
     fi
 done
 
