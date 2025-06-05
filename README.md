@@ -13,6 +13,7 @@ Then running this script regularly will ensure nothing critical has changed or h
 ### EXAMPLES:
 
 \- example with no issue detected:  
-![example_1](https://github.com/user-attachments/assets/1814e6c6-e930-49aa-a019-86b3729e2cbe)  
+![example_1](https://github.com/user-attachments/assets/d8c9a922-1e3e-4a12-bf26-5d36ad6c36d0)  
 \- example with issues detected:  
-![example_2](https://github.com/user-attachments/assets/70e3fc95-c62a-4c7c-8691-fbf57160af3c)  
+![example_2](https://github.com/user-attachments/assets/e3c4c71e-f143-4ac9-80ac-c7ea8b957f16)  
+
