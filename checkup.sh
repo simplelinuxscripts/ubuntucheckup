@@ -143,6 +143,15 @@ else
     print_success "xsessions"
 fi
 
+# Check if sessions were opened by other users
+sessions_opened_by_other_users=$(journalctl -u systemd-logind --no-pager | grep -i "New session" | grep -v "$(whoami)." | grep -v "user sddm.")
+if [ -n "$sessions_opened_by_other_users" ]; then
+    echo "$sessions_opened_by_other_users" | awk '{print $NF}' | sort | uniq
+    print_warning "sessions were opened by above other user(s)"
+else
+    print_success "opened sessions"
+fi
+
 echo
 echo "---------- Network check ----------"
 echo
@@ -205,8 +214,12 @@ echo
 echo "---------- Disk check ----------"
 echo
 
-if ! $(lsblk -o NAME,KNAME,FSTYPE,TYPE,MOUNTPOINT,SIZE | grep -q "crypt"); then
-    print_warning "no disk is encrypted"
+# Check disk usage
+usage=$(df / | awk 'NR==2 {print $5}' | sed 's/%//')
+if [ "$usage" -ge 50 ]; then
+    print_warning "disk usage is high: $usage%"
+else
+    print_success "disk usage ($usage%)"
 fi
 
 disk_status=$(sudo smartctl -a "${HARD_DISK_DEVICE}")
@@ -222,6 +235,11 @@ elif ! $(echo "${disk_status}" | grep -q "Media and Data Integrity Errors:    0"
     print_error "disk errors detected (media and data integrity)"
 else
     print_success "disk health"
+fi
+
+# Check disk encryption
+if ! $(lsblk -o NAME,KNAME,FSTYPE,TYPE,MOUNTPOINT,SIZE | grep -q "crypt"); then
+    print_warning "no disk is encrypted"
 fi
 
 echo
@@ -252,6 +270,14 @@ fi
 find /proc/*/exe -lname '*(deleted)' 2>/dev/null | while read -r exe; do
     print_error "suspicious process: deleted executable is still running: $exe"
 done
+
+# Detect zombie processes
+# Zombie processes are those that have completed execution but still exist in the process table because their parent hasn't cleaned them up
+zombie_processes=$(ps aux | awk '$8 ~ /^Z/ { print $0 }')
+if [ -n "$zombie_processes" ]; then
+    echo "$zombie_processes"
+    print_warning "above zombie processes were detected"
+fi
 
 echo
 echo "---------- Apparmor check ----------"
@@ -570,9 +596,9 @@ if [ -d "${SNAP_FIREFOX_PROFILE_FOLDER}" ]; then
         #     print_warning "firefox addons have changed (${SNAP_FIREFOX_PROFILE_FOLDER}/addons.json)"
         # fi
         grep -oE '"name":"[^"]*"|"id":"[^"]*|"path":"[^"]*|"rootURI":"[^"]*"' "${CHECKUP_FOLDER}/firefox/extensions_sauv.json" | sed 's/[0-9]\+/X/g' > "${CHECKUP_FOLDER}/firefox/extensions_names_sauv_reformated.json"
-        cat "${CHECKUP_FOLDER}/firefox/extensions_names_sauv_reformated.json" | sort > "${CHECKUP_FOLDER}/firefox/extensions_names_sauv_reformated_sorted.json"
+        cat "${CHECKUP_FOLDER}/firefox/extensions_names_sauv_reformated.json" | sed -E 's|/features/[^/]+/|/features/xxx/|g' | sort > "${CHECKUP_FOLDER}/firefox/extensions_names_sauv_reformated_sorted.json"
         grep -oE '"name":"[^"]*"|"id":"[^"]*|"path":"[^"]*|"rootURI":"[^"]*"' "${SNAP_FIREFOX_PROFILE_FOLDER}/extensions.json" | sed 's/[0-9]\+/X/g' > "${CHECKUP_FOLDER}/firefox/extensions_names_current_reformated.json"
-        cat "${CHECKUP_FOLDER}/firefox/extensions_names_current_reformated.json" | sort > "${CHECKUP_FOLDER}/firefox/extensions_names_current_reformated_sorted.json"
+        cat "${CHECKUP_FOLDER}/firefox/extensions_names_current_reformated.json" | sed -E 's|/features/[^/]+/|/features/xxx/|g' | sort > "${CHECKUP_FOLDER}/firefox/extensions_names_current_reformated_sorted.json"
         sed 's/[0-9]\+/X/g' "${CHECKUP_FOLDER}/firefox/extensions_sauv.json" | sed 's/},/},\n/g' > "${CHECKUP_FOLDER}/firefox/extensions_sauv_reformated.json"
         sed 's/[0-9]\+/X/g' "${SNAP_FIREFOX_PROFILE_FOLDER}/extensions.json" | sed 's/},/},\n/g' > "${CHECKUP_FOLDER}/firefox/extensions_current_reformated.json"
         diff "${CHECKUP_FOLDER}/firefox/extensions_names_sauv_reformated_sorted.json" "${CHECKUP_FOLDER}/firefox/extensions_names_current_reformated_sorted.json"
@@ -827,6 +853,8 @@ done
 # 3) basic suspicious keywords in module names
 suspicious_keywords='rootkit|snif|backdoor|stealth|keylog|troj|virus|hack|malware|spy|tap|inject|hide|hidden|cloak|transparent'
 lsmod | grep -Ei "$suspicious_keywords" && print_error "suspicious module(s) found"
+
+# 4) if you install optional chkrootkit package, more complex rootkit detections can be done.
 
 # In Ubuntu, snap is used by default instead of flatpak
 if echo "${apt_list_installed}" | grep -q "flatpak"; then
