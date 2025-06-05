@@ -216,7 +216,7 @@ echo
 
 # Check disk usage
 usage=$(df / | awk 'NR==2 {print $5}' | sed 's/%//')
-if [ "$usage" -ge 50 ]; then
+if [ "$usage" -ge 55 ]; then
     print_warning "disk usage is high: $usage%"
 else
     print_success "disk usage ($usage%)"
@@ -854,7 +854,7 @@ done
 suspicious_keywords='rootkit|snif|backdoor|stealth|keylog|troj|virus|hack|malware|spy|tap|inject|hide|hidden|cloak|transparent'
 lsmod | grep -Ei "$suspicious_keywords" && print_error "suspicious module(s) found"
 
-# 4) if you install optional chkrootkit package, more complex rootkit detections can be done.
+# 4) if you install optional chkrootkit package, more complex rootkit detections can be done
 
 # In Ubuntu, snap is used by default instead of flatpak
 if echo "${apt_list_installed}" | grep -q "flatpak"; then
