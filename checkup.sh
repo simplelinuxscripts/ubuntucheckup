@@ -45,7 +45,7 @@ SNAP_CHROMIUM_FOLDER="${SNAP_FOLDER}/chromium/common/chromium/Default"
 # Expected PATH environment variable value (any change of PATH environment variable will be detected)
 EXPECTED_PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games:/usr/local/games:/snap/bin:${HOME}/DOCUMENTS/Informatique/Programmes/Linux:${HOME}/DOCUMENTS/Informatique/Programmes/Linux/simplelinuxscripts/findlines:${HOME}/DOCUMENTS/Informatique/Programmes/Linux/simplelinuxscripts/ubuntucheckup"
 
-# Expected program(s) in /usr/local/bin if any ("" if none)
+# Expected program(s) in /usr/local/bin if any, "" if none
 EXPECTED_USR_LOCAL_BIN_PROGRAMS="dragon gwenview kate obs"
 
 # Optional: folder used to save a copy of some important configuration files
@@ -426,6 +426,20 @@ if ! [ "$file_list" == "$EXPECTED_USR_LOCAL_BIN_PROGRAMS" ]; then
     print_error "/usr/local/bin contains unexpected local/manually-installed program(s) among above ones"
 fi
 
+# Check files with special SUID or SGID permissions. SUID (Set User ID) and SGID (Set Group ID) are special permission bits in Linux that allow executable files
+# to run with the privileges of their owner or group instead of the user who executes them (=> potential risk of privilege escalation or unauthorized access)
+if [ -f "${CHECKUP_FOLDER}/files_with_special_SUID_or_SGID_permissions_sauv.txt" ]; then
+    sudo find / -type f \( -perm -4000 -o -perm -2000 \) -exec ls {} \; 2> /dev/null | grep -v "/snap/" > "${CHECKUP_FOLDER}/files_with_special_SUID_or_SGID_permissions_current.txt"
+    diff "${CHECKUP_FOLDER}/files_with_special_SUID_or_SGID_permissions_sauv.txt" "${CHECKUP_FOLDER}/files_with_special_SUID_or_SGID_permissions_current.txt"
+    if [ $? -ne 0 ]; then
+        print_error "list of files with special SUID or SGID permissions has changed (check changes and copy file ${CHECKUP_FOLDER}/files_with_special_SUID_or_SGID_permissions_current.txt to ${CHECKUP_FOLDER}/files_with_special_SUID_or_SGID_permissions_sauv.txt)"
+    else
+        print_success "files with special SUID or SGID permissions"
+    fi
+else
+    print_warning "files with special SUID or SGID permissions check is skipped because reference file ${CHECKUP_FOLDER}/files_with_special_SUID_or_SGID_permissions_sauv.txt does not exist"
+fi
+
 # Check errors in system logs
 today_date=$(date +"%Y-%m-%d")
 one_day_ago_date=$(date -d "yesterday" +"%Y-%m-%d")
@@ -445,6 +459,11 @@ else
     echo "$serious_errors_in_system_logs"
     print_warning "above errors were found in system logs"
 fi
+
+# Detect processes that are still executing after their executable files have been removed (suspicious processes)
+find /proc/*/exe -lname '*(deleted)' 2>/dev/null | while read -r exe; do
+    print_error "suspicious process: deleted executable is still running: $exe"
+done
 
 echo
 sudo apt-get check > /dev/null
@@ -639,13 +658,60 @@ else
     print_success "package files storage"
 fi
 
-
+# Check MD5 checksums
 echo
 error_found=0
 if [ ${EXTENDED_CHECKS} -eq 0 ]; then
-    echo "checking main MD5 checksums for installed packages..."
-    # /lib and /usr/lib are not considered because processing can be long
+    echo "checking MD5 checksums of main binaries..."
+
+    # /lib and /usr/lib are not considered because processing can be long (set EXTENDED_CHECKS to 1 to check those folders too)
     find /bin /sbin /usr/bin /usr/sbin -type f -exec md5sum {} \; > /tmp/md5sums
+
+    critical_bins=(
+        # Core utilities
+        "/bin/ls" "/bin/ps" "/bin/bash" "/bin/sh" "/bin/mount" "/bin/umount"
+        "/bin/su" "/bin/login" "/bin/systemd"
+
+        # Process and system monitoring
+        "/usr/bin/top" "/usr/bin/htop" "/usr/bin/uptime" "/usr/bin/w" "/usr/bin/who"
+        "/usr/bin/kill" "/usr/bin/killall" "/usr/bin/pstree" "/usr/bin/strace"
+        "/usr/bin/lsof" "/usr/bin/time" "/usr/bin/watch"
+
+        # Networking tools
+        "/usr/bin/netstat" "/usr/bin/ss" "/usr/bin/ifconfig" "/usr/bin/ip"
+        "/usr/bin/ping" "/usr/bin/traceroute" "/usr/bin/nmap"
+        "/usr/bin/curl" "/usr/bin/wget" "/usr/bin/telnet" "/usr/bin/nc"
+
+        # Authentication and privilege escalation
+        "/usr/bin/sudo" "/usr/bin/passwd" "/usr/bin/chage" "/usr/bin/gpasswd"
+        "/usr/bin/login" "/usr/bin/chsh" "/usr/bin/chfn"
+
+        # File and system utilities
+        "/usr/bin/find" "/usr/bin/locate" "/usr/bin/updatedb" "/usr/bin/file"
+        "/usr/bin/which" "/usr/bin/whereis" "/usr/bin/realpath"
+
+        # Package and service management
+        "/usr/bin/systemctl" "/usr/bin/journalctl" "/usr/bin/dpkg" "/usr/bin/rpm"
+        "/usr/bin/yum" "/usr/bin/apt" "/usr/bin/apt-get"
+
+        # SSH and remote access
+        "/usr/bin/ssh" "/usr/sbin/sshd" "/usr/bin/scp" "/usr/bin/sftp"
+
+        # Cron and scheduled tasks
+        "/usr/sbin/crond" "/usr/bin/crontab"
+
+        # Encryption and security
+        "/usr/bin/gpg" "/usr/bin/openssl" "/usr/bin/ssh-keygen"
+
+        # Misc
+        "/usr/bin/env" "/usr/bin/xargs" "/usr/bin/awk" "/usr/bin/sed"
+    )
+    for bin in "${critical_bins[@]}"; do
+        if [[ -f "$bin" ]]; then
+            md5sum "$bin" >> /tmp/md5sums
+        fi
+    done
+
     while read line; do
         hash=$(echo "$line" | cut -d' ' -f1)
         path=$(echo "$line" | cut -d' ' -f2-)
@@ -655,10 +721,13 @@ if [ ${EXTENDED_CHECKS} -eq 0 ]; then
             error_found=1
         fi
     done < /tmp/md5sums
+    if [ ${error_found} -eq 0 ]; then
+        print_success "MD5 checksums of main binaries"
+    fi
 else
     # Check all files with an associated MD5 checksum (in addition to above checks done by sudo dpkg --verify). This step can be long.
     # Can be replaced by "sudo debsums -s" if you installed the debsums package.
-    echo "checking all MD5 checksums for installed packages (can be long)..."
+    echo "checking all possible MD5 checksums (can be long)..."
     first_letter="NA"
     for md5file in /var/lib/dpkg/info/*.md5sums; do
         pkgname=$(basename "$md5file" .md5sums)
@@ -690,9 +759,9 @@ else
 
         done < "$md5file"
     done
-fi
-if [ ${error_found} -eq 0 ]; then
-    print_success "MD5 checksums for installed packages"
+    if [ ${error_found} -eq 0 ]; then
+        print_success "all possible MD5 checksums"
+    fi
 fi
 
 apt_list_installed=$(apt list --installed 2> /dev/null)
@@ -714,6 +783,47 @@ if command -v kwallet-query &> /dev/null; then
         print_warning "KDE wallet is used"
     fi
 fi
+
+# known suspicious files or folders
+known_suspicious_files=(
+    # Known rootkit files
+    "/usr/bin/ssh2" "/usr/sbin/in.telnetd" "/dev/.lib"
+    "/dev/.static" "/dev/.golf" "/dev/.chr"
+    "/dev/.rc" "/dev/.tty" "/etc/rc.d/rc.local"
+
+    # Hidden or unusual binaries
+    "/usr/bin/.../" "/usr/bin/.etc" "/usr/bin/.bash"
+    "/usr/lib/libfltr.so" "/usr/lib/.fx" "/usr/lib/.gdm"
+    "/usr/lib/.lib" "/usr/lib/.x" "/usr/lib/.z"
+
+    # Suspicious folders
+    "/dev/.udev" "/dev/.init" "/dev/.shadow"
+    "/etc/.sysconfig" "/etc/.rc.d/init.d/.kthreadd"
+
+    # Backdoor or persistence files
+    "/etc/inetd.conf" "/etc/xinetd.conf" "/etc/ld.so.hash"
+    "/usr/lib/libproc.a" "/usr/lib/libproc.so"
+
+    # Deleted or hidden binaries
+    "/tmp/.../" "/tmp/.X11-unix/.X0-lock" "/tmp/.X11-unix/.Xauth"
+    "/var/tmp/.../" "/var/tmp/.X0-lock" "/var/tmp/.Xauth"
+
+    # Kernel module hiding
+    "/lib/modules/$(uname -r)/kernel/drivers/usb/hid/hid.ko"
+    "/lib/modules/$(uname -r)/extra/.hidden"
+
+    # Misc
+    "/boot/System.map" "/boot/.vmlinuz" "/boot/.initrd"
+)
+for elt in "${known_suspicious_files[@]}"; do
+    if [ -e "$elt" ]; then
+        print_error "Suspicious file or folder found: $elt"
+    fi
+done
+
+# basic suspicious keywords in module names
+suspicious_keywords='rootkit|snif|backdoor|stealth|keylog|troj|virus|hack|malware|spy|tap|inject|hide|hidden|cloak|transparent'
+lsmod | grep -Ei "$suspicious_keywords" && print_error "suspicious module(s) found"
 
 # in ubuntu, snap is used by default instead of flatpak
 if echo "${apt_list_installed}" | grep -q "flatpak"; then

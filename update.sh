@@ -49,6 +49,7 @@ if [ -n "${snap_packages_that_can_be_updated}" ]; then
     echo
 fi
 
+echo "Running apt update..."
 sudo apt update
 if [ $? -ne 0 ]; then
     # detect errors like GPG key errors, hash sum mismatches...
@@ -56,6 +57,9 @@ if [ $? -ne 0 ]; then
     echo
     exit 1
 fi
+
+echo
+read -p "Press Enter to check available upgrades..."
 echo
 
 echo "Packages to upgrade:"
@@ -71,6 +75,9 @@ fi
 
 echo
 read -p "Press Enter to start upgrades..."
+echo
+
+echo "Running apt upgrade..."
 sudo apt upgrade
 if [ $? -ne 0 ]; then
     print_error "apt upgrade failed"
