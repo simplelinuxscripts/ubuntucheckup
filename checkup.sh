@@ -2,7 +2,11 @@
 
 ############################
 #
-# Linux bash script to check safety and health of Ubuntu installation (~ "Ubuntu antivirus")
+# A Linux bash script to verify the safety and health of an Ubuntu installation.
+# It detects potential issues and displays warning/error messages, similar to an antivirus scan.
+# Customize it to fit your specific installation.
+# Running it regularly helps ensure that no critical components have changed or been corrupted.
+# (https://github.com/simplelinuxscripts/ubuntucheckup)
 #
 ############################
 
