@@ -105,7 +105,7 @@ if ! [ -d "${CHECKUP_FOLDER}" ]; then
 fi
 
 echo
-echo "---------- Check account ----------"
+echo "---------- Account check ----------"
 echo
 
 # Check that password is requested for sudo commands
@@ -122,7 +122,29 @@ else
 fi
 
 echo
-echo "---------- Check network connections ----------"
+echo "---------- Session check ----------"
+echo
+
+# Check that ubuntu wayland session is available (safer than X11 and Xorg)
+ubuntu_wayland_sessions=$(ls /usr/share/wayland-sessions/ | grep -E "ubuntu.*\.desktop") # example of ls /usr/share/wayland-sessions/ output: plasma.desktop  ubuntu-wayland.desktop  ubuntu.desktop
+if [ -z "${ubuntu_wayland_sessions}" ]; then
+    print_error "no ubuntu wayland session is available"
+# Check that current session type is wayland (safer than X11 and Xorg)
+elif ! [ "$XDG_SESSION_TYPE" == "wayland" ]; then
+    print_error "wayland session type was not selected in login screen ($XDG_SESSION_TYPE)"
+else
+    print_success "wayland session"
+fi
+# Check that at least one ubuntu xsession is available (useful as a backup session in case of issues with desktops other than gnome)
+ubuntu_xsessions=$(ls /usr/share/xsessions/ | grep -E "ubuntu.*\.desktop") # example of ls /usr/share/xsessions/ output: plasmax11.desktop  ubuntu-xorg.desktop  ubuntu.desktop
+if [ -z "${ubuntu_xsessions}" ]; then
+    print_warning "no ubuntu xsession is available"
+else
+    print_success "xsessions"
+fi
+
+echo
+echo "---------- Network check ----------"
 echo
 
 ping -c 1 -W 5 "www.google.com" > /dev/null 2>&1
@@ -141,12 +163,9 @@ else
     print_warning "wireless connection(s) enabled"
 fi
 
-echo
-echo "---------- Check firewall ----------"
-echo
-
+# Check firewall
+echo "checking firewall..."
 ufw_status=$(sudo ufw status verbose)
-
 ufw_status_1=$(echo "${ufw_status}" | grep -o "Status: active")
 if [ "$ufw_status_1" == "Status: active" ]; then
     print_success "ufw enabled"
@@ -183,7 +202,59 @@ else
 fi
 
 echo
-echo "---------- Check apparmor ----------"
+echo "---------- Disk check ----------"
+echo
+
+if ! $(lsblk -o NAME,KNAME,FSTYPE,TYPE,MOUNTPOINT,SIZE | grep -q "crypt"); then
+    print_warning "no disk is encrypted"
+fi
+
+disk_status=$(sudo smartctl -a "${HARD_DISK_DEVICE}")
+if echo "${disk_status}" | grep -i -E 'FAIL|error|Reallocated_Sector_Ct|Current_Pending_Sector|Offline_Uncorrectable|Bad|Uncorrectable|Unable' | grep -v "Media and Data Integrity Errors:    0" | grep -v "Error Information" | grep -v "No Errors Logged"; then
+    print_error "disk errors detected, see above"
+elif ! $(echo "${disk_status}" | grep -q "SMART overall-health self-assessment test result: PASSED"); then
+    print_error "disk errors detected (test result)"
+elif ! $(echo "${disk_status}" | grep -q "No Errors Logged"); then
+    print_error "disk errors detected (errors logged)"
+elif ! $(echo "${disk_status}" | grep -q "Critical Warning:                   0x00"); then
+    print_error "disk errors detected (critical warnings)"
+elif ! $(echo "${disk_status}" | grep -q "Media and Data Integrity Errors:    0"); then
+    print_error "disk errors detected (media and data integrity)"
+else
+    print_success "disk health"
+fi
+
+echo
+echo "---------- Runtime check ----------"
+echo
+
+# Check errors in system logs
+today_date=$(date +"%Y-%m-%d")
+one_day_ago_date=$(date -d "yesterday" +"%Y-%m-%d")
+two_days_ago_date=$(date -d "2 days ago" +"%Y-%m-%d")
+three_days_ago_date=$(date -d "3 days ago" +"%Y-%m-%d")
+four_days_ago_date=$(date -d "4 days ago" +"%Y-%m-%d")
+five_days_ago_date=$(date -d "5 days ago" +"%Y-%m-%d")
+six_days_ago_date=$(date -d "6 days ago" +"%Y-%m-%d")
+seven_days_ago_date=$(date -d "7 days ago" +"%Y-%m-%d")
+if ! [[ -e /var/log/syslog && -e /var/log/kern.log && -e /var/log/auth.log ]]; then # same list of files as below
+    print_warning "some system logs files to be checked are missing"
+fi
+serious_errors_in_system_logs=$(more /var/log/syslog /var/log/kern.log /var/log/auth.log | grep -iP "$today_date|$one_day_ago_date|$two_days_ago_date|$three_days_ago_date|$four_days_ago_date|$five_days_ago_date|$six_days_ago_date|$seven_days_ago_date" | grep -iv "not severe" | grep -iv "not critical" | grep -iv "not fatal" | grep -iP --color=always "severe|critical|fatal|alert|emergency|panic|segfault")
+if [ "${serious_errors_in_system_logs}" == "" ]; then
+    print_success "system logs"
+else
+    echo "$serious_errors_in_system_logs"
+    print_warning "above errors were found in system logs"
+fi
+
+# Detect processes that are still executing after their executable files have been removed (suspicious processes)
+find /proc/*/exe -lname '*(deleted)' 2>/dev/null | while read -r exe; do
+    print_error "suspicious process: deleted executable is still running: $exe"
+done
+
+echo
+echo "---------- Apparmor check ----------"
 echo
 
 error_found=0
@@ -205,20 +276,20 @@ elif [ -z "${apparmor_active}" ]; then
     error_found=1
 # Check total number of apparmor [enforce] profiles and processes
 elif [ "${nb_apparmor_enforce_profiles}" == "" ] || [ ${nb_apparmor_enforce_profiles} -lt 50 ]; then # (adapt threshold value in this condition as needed)
-  print_error "too few apparmor profiles in enforce mode (${nb_apparmor_enforce_profiles})"
-  error_found=1
-elif [ "${nb_apparmor_processes}" == "" ] || [ ${nb_apparmor_processes} -lt 5 ]; then # (adapt threshold value in this condition as needed)
-  print_error "too few apparmor processes (${nb_apparmor_processes})"
-  error_found=1
-elif [ "${nb_apparmor_enforce_processes}" == "" ] || [ ${nb_apparmor_enforce_processes} -eq 0 ]; then
-  print_error "no apparmor processes in enforce mode"
-  error_found=1
-else
-  enforce_ratio=$((100 * nb_apparmor_enforce_processes / nb_apparmor_processes))
-  if [ ${enforce_ratio} -lt 80 ]; then # (adapt threshold value in this condition as needed)
-    print_error "too few apparmor processes in enforce mode (${nb_apparmor_enforce_processes} out of ${nb_apparmor_processes}: ${enforce_ratio}%)"
+    print_error "too few apparmor profiles in enforce mode (${nb_apparmor_enforce_profiles})"
     error_found=1
-  fi
+elif [ "${nb_apparmor_processes}" == "" ] || [ ${nb_apparmor_processes} -lt 5 ]; then # (adapt threshold value in this condition as needed)
+    print_error "too few apparmor processes (${nb_apparmor_processes})"
+    error_found=1
+elif [ "${nb_apparmor_enforce_processes}" == "" ] || [ ${nb_apparmor_enforce_processes} -eq 0 ]; then
+    print_error "no apparmor processes in enforce mode"
+    error_found=1
+else
+    enforce_ratio=$((100 * nb_apparmor_enforce_processes / nb_apparmor_processes))
+    if [ ${enforce_ratio} -lt 80 ]; then # (adapt threshold value in this condition as needed)
+        print_error "too few apparmor processes in enforce mode (${nb_apparmor_enforce_processes} out of ${nb_apparmor_processes}: ${enforce_ratio}%)"
+        error_found=1
+    fi
 fi
 # Check apparmor namespace creation restrictions
 apparmor_restrict_unprivileged_userns=$(sysctl kernel.apparmor_restrict_unprivileged_userns)
@@ -260,52 +331,7 @@ if [ ${error_found} -eq 0 ]; then
 fi
 
 echo
-echo "---------- Check disk ----------"
-echo
-
-if ! $(lsblk -o NAME,KNAME,FSTYPE,TYPE,MOUNTPOINT,SIZE | grep -q "crypt"); then
-    print_warning "no disk is encrypted"
-fi
-
-disk_status=$(sudo smartctl -a "${HARD_DISK_DEVICE}")
-if echo "${disk_status}" | grep -i -E 'FAIL|error|Reallocated_Sector_Ct|Current_Pending_Sector|Offline_Uncorrectable|Bad|Uncorrectable|Unable' | grep -v "Media and Data Integrity Errors:    0" | grep -v "Error Information" | grep -v "No Errors Logged"; then
-    print_error "disk errors detected, see above"
-elif ! $(echo "${disk_status}" | grep -q "SMART overall-health self-assessment test result: PASSED"); then
-    print_error "disk errors detected (test result)"
-elif ! $(echo "${disk_status}" | grep -q "No Errors Logged"); then
-    print_error "disk errors detected (errors logged)"
-elif ! $(echo "${disk_status}" | grep -q "Critical Warning:                   0x00"); then
-    print_error "disk errors detected (critical warnings)"
-elif ! $(echo "${disk_status}" | grep -q "Media and Data Integrity Errors:    0"); then
-    print_error "disk errors detected (media and data integrity)"
-else
-    print_success "disk health"
-fi
-
-echo
-echo "---------- Check sessions ----------"
-echo
-
-# Check that ubuntu wayland session is available (safer than X11 and Xorg)
-ubuntu_wayland_sessions=$(ls /usr/share/wayland-sessions/ | grep -E "ubuntu.*\.desktop") # example of ls /usr/share/wayland-sessions/ output: plasma.desktop  ubuntu-wayland.desktop  ubuntu.desktop
-if [ -z "${ubuntu_wayland_sessions}" ]; then
-    print_error "no ubuntu wayland session is available"
-# Check that current session type is wayland (safer than X11 and Xorg)
-elif ! [ "$XDG_SESSION_TYPE" == "wayland" ]; then
-    print_error "wayland session type was not selected in login screen ($XDG_SESSION_TYPE)"
-else
-    print_success "wayland session"
-fi
-# Check that at least one ubuntu xsession is available (useful as a backup session in case of issues with desktops other than gnome)
-ubuntu_xsessions=$(ls /usr/share/xsessions/ | grep -E "ubuntu.*\.desktop") # example of ls /usr/share/xsessions/ output: plasmax11.desktop  ubuntu-xorg.desktop  ubuntu.desktop
-if [ -z "${ubuntu_xsessions}" ]; then
-    print_warning "no ubuntu xsession is available"
-else
-    print_success "xsessions"
-fi
-
-echo
-echo "---------- Check install ----------"
+echo "---------- Install check ----------"
 echo
 
 error_found=0
@@ -402,6 +428,20 @@ else
     print_warning "startup services check is skipped because reference file ${CHECKUP_FOLDER}/.config/autostart does not exist"
 fi
 
+# Check files with special SUID or SGID permissions. SUID (Set User ID) and SGID (Set Group ID) are special permission bits in Linux that allow executable files
+# to run with the privileges of their owner or group instead of the user who executes them (=> potential risk of privilege escalation or unauthorized access)
+if [ -f "${CHECKUP_FOLDER}/files_with_special_SUID_or_SGID_permissions_sauv.txt" ]; then
+    sudo find / -type f \( -perm -4000 -o -perm -2000 \) -exec ls {} \; 2> /dev/null | grep -v "/snap/" > "${CHECKUP_FOLDER}/files_with_special_SUID_or_SGID_permissions_current.txt"
+    diff "${CHECKUP_FOLDER}/files_with_special_SUID_or_SGID_permissions_sauv.txt" "${CHECKUP_FOLDER}/files_with_special_SUID_or_SGID_permissions_current.txt"
+    if [ $? -ne 0 ]; then
+        print_error "list of files with special SUID or SGID permissions has changed (check changes and copy file ${CHECKUP_FOLDER}/files_with_special_SUID_or_SGID_permissions_current.txt to ${CHECKUP_FOLDER}/files_with_special_SUID_or_SGID_permissions_sauv.txt)"
+    else
+        print_success "files with special SUID or SGID permissions"
+    fi
+else
+    print_warning "files with special SUID or SGID permissions check is skipped because reference file ${CHECKUP_FOLDER}/files_with_special_SUID_or_SGID_permissions_sauv.txt does not exist"
+fi
+
 # Check PATH environment variable
 if [ "$PATH" == "$EXPECTED_PATH" ]; then
     print_success "PATH environment variable"
@@ -425,45 +465,6 @@ if ! [ "$file_list" == "$EXPECTED_USR_LOCAL_BIN_PROGRAMS" ]; then
     echo "$file_list"
     print_error "/usr/local/bin contains unexpected local/manually-installed program(s) among above ones"
 fi
-
-# Check files with special SUID or SGID permissions. SUID (Set User ID) and SGID (Set Group ID) are special permission bits in Linux that allow executable files
-# to run with the privileges of their owner or group instead of the user who executes them (=> potential risk of privilege escalation or unauthorized access)
-if [ -f "${CHECKUP_FOLDER}/files_with_special_SUID_or_SGID_permissions_sauv.txt" ]; then
-    sudo find / -type f \( -perm -4000 -o -perm -2000 \) -exec ls {} \; 2> /dev/null | grep -v "/snap/" > "${CHECKUP_FOLDER}/files_with_special_SUID_or_SGID_permissions_current.txt"
-    diff "${CHECKUP_FOLDER}/files_with_special_SUID_or_SGID_permissions_sauv.txt" "${CHECKUP_FOLDER}/files_with_special_SUID_or_SGID_permissions_current.txt"
-    if [ $? -ne 0 ]; then
-        print_error "list of files with special SUID or SGID permissions has changed (check changes and copy file ${CHECKUP_FOLDER}/files_with_special_SUID_or_SGID_permissions_current.txt to ${CHECKUP_FOLDER}/files_with_special_SUID_or_SGID_permissions_sauv.txt)"
-    else
-        print_success "files with special SUID or SGID permissions"
-    fi
-else
-    print_warning "files with special SUID or SGID permissions check is skipped because reference file ${CHECKUP_FOLDER}/files_with_special_SUID_or_SGID_permissions_sauv.txt does not exist"
-fi
-
-# Check errors in system logs
-today_date=$(date +"%Y-%m-%d")
-one_day_ago_date=$(date -d "yesterday" +"%Y-%m-%d")
-two_days_ago_date=$(date -d "2 days ago" +"%Y-%m-%d")
-three_days_ago_date=$(date -d "3 days ago" +"%Y-%m-%d")
-four_days_ago_date=$(date -d "4 days ago" +"%Y-%m-%d")
-five_days_ago_date=$(date -d "5 days ago" +"%Y-%m-%d")
-six_days_ago_date=$(date -d "6 days ago" +"%Y-%m-%d")
-seven_days_ago_date=$(date -d "7 days ago" +"%Y-%m-%d")
-if ! [[ -e /var/log/syslog && -e /var/log/kern.log && -e /var/log/auth.log ]]; then # same list of files as below
-    print_warning "some system logs files to be checked are missing"
-fi
-serious_errors_in_system_logs=$(more /var/log/syslog /var/log/kern.log /var/log/auth.log | grep -iP "$today_date|$one_day_ago_date|$two_days_ago_date|$three_days_ago_date|$four_days_ago_date|$five_days_ago_date|$six_days_ago_date|$seven_days_ago_date" | grep -iv "not severe" | grep -iv "not critical" | grep -iv "not fatal" | grep -iP --color=always "severe|critical|fatal|alert|emergency|panic|segfault")
-if [ "${serious_errors_in_system_logs}" == "" ]; then
-    print_success "system logs"
-else
-    echo "$serious_errors_in_system_logs"
-    print_warning "above errors were found in system logs"
-fi
-
-# Detect processes that are still executing after their executable files have been removed (suspicious processes)
-find /proc/*/exe -lname '*(deleted)' 2>/dev/null | while read -r exe; do
-    print_error "suspicious process: deleted executable is still running: $exe"
-done
 
 echo
 sudo apt-get check > /dev/null
@@ -726,7 +727,7 @@ if [ ${EXTENDED_CHECKS} -eq 0 ]; then
     fi
 else
     # Check all files with an associated MD5 checksum (in addition to above checks done by sudo dpkg --verify). This step can be long.
-    # Can be replaced by "sudo debsums -s" if you installed the debsums package.
+    # Can be replaced by "sudo debsums -s" if you installed the optional debsums package.
     echo "checking all possible MD5 checksums (can be long)..."
     first_letter="NA"
     for md5file in /var/lib/dpkg/info/*.md5sums; do
@@ -767,7 +768,9 @@ fi
 apt_list_installed=$(apt list --installed 2> /dev/null)
 nb_packages_installed=$(echo "${apt_list_installed}" | wc -l)
 
-# known unsafe packages
+# Check known unsafe files/folders/packages:
+
+# 1) known unsafe packages (adapt as needed)
 if echo "${apt_list_installed}" | grep -q "^vino"; then
     print_error "vino is installed (security risk)"
 fi
@@ -784,7 +787,7 @@ if command -v kwallet-query &> /dev/null; then
     fi
 fi
 
-# known suspicious files or folders
+# 2) known suspicious files or folders
 known_suspicious_files=(
     # Known rootkit files
     "/usr/bin/ssh2" "/usr/sbin/in.telnetd" "/dev/.lib"
@@ -821,31 +824,32 @@ for elt in "${known_suspicious_files[@]}"; do
     fi
 done
 
-# basic suspicious keywords in module names
+# 3) basic suspicious keywords in module names
 suspicious_keywords='rootkit|snif|backdoor|stealth|keylog|troj|virus|hack|malware|spy|tap|inject|hide|hidden|cloak|transparent'
 lsmod | grep -Ei "$suspicious_keywords" && print_error "suspicious module(s) found"
 
-# in ubuntu, snap is used by default instead of flatpak
+# In Ubuntu, snap is used by default instead of flatpak
 if echo "${apt_list_installed}" | grep -q "flatpak"; then
     print_warning "flatpak is installed (snap is preferred to flatpak in Ubuntu)"
 fi
 
 apt_cache_policy_all_packages=$(apt-cache policy $(dpkg-query -W -f='${binary:Package}\n'))
 
-# proprietary drivers for devices supported by ubuntu but not open source
+# Check proprietary drivers for devices supported by Ubuntu but not open source
 restricted_packages=$(echo "${apt_cache_policy_all_packages}" | grep -B5 'restricted')
 if [ -n "$restricted_packages" ]; then
     echo "$restricted_packages"
     print_error "restricted packages are installed"
 fi
 
-# software not officially supported by ubuntu
+# Check software not officially supported by Ubuntu
 multiverse_packages=$(echo "${apt_cache_policy_all_packages}" | grep -B5 'multiverse')
 if [ -n "$multiverse_packages" ]; then
     echo "$multiverse_packages"
     print_error "multiverse packages are installed"
 fi
 
+# Check backports packages
 # oracular-backports software (manually installed packages from backports repository do not receive security updates / there can be occasionally compatibility issues => to avoid for stability and security reasons)
 # (backports repository can be seen in Software & Updates / Other Software tab, and shall not be removed if automatically listed here)
 backports_packages=$(echo "${apt_cache_policy_all_packages}" | grep -B5 'backports')
@@ -854,7 +858,7 @@ if [ -n "$backports_packages" ]; then
     print_error "backports packages are installed"
 fi
 
-# obsolete packages
+# Check obsolete packages
 obsolete_packages=$(apt list ~o 2> /dev/null | grep -v "Listing...")
 if [ -n "$obsolete_packages" ]; then
     echo "$obsolete_packages"
