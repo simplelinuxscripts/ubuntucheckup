@@ -840,7 +840,7 @@ if echo "${apt_list_installed}" | grep -q "chrome"; then
     print_error "chrome is installed (snap chromium shall be preferred because open source)"
 fi
 if command -v kwallet-query &> /dev/null; then
-    kde_wallet_unused=$(kwallet-query kdewallet -l 2> /dev/null | grep "The folder Passwords does not exist")
+    kde_wallet_unused=$(kwallet-query kdewallet -l 2> /dev/null | grep -E "Wallet kdewallet not found|The folder Passwords does not exist")
     if [ -z "${kde_wallet_unused}" ]; then
         print_warning "KDE wallet is used"
     fi
