@@ -484,7 +484,7 @@ fi
 scheduled_cron_jobs=$(crontab -l 2>&1 | grep -v "no crontab for")
 if [ -n "${scheduled_cron_jobs}" ]; then
     echo ${scheduled_cron_jobs}
-    print_error "jobs are scheduled with cron"
+    print_error "unexpected jobs are scheduled with cron"
 fi
 
 # Check files with special SUID or SGID permissions. SUID (Set User ID) and SGID (Set Group ID) are special permission bits in Linux that allow executable files
