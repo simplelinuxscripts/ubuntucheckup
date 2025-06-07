@@ -458,6 +458,27 @@ else
     print_warning "startup services check is skipped because reference file ${CHECKUP_FOLDER}/.config/autostart does not exist"
 fi
 
+# Check startup shells
+if [ -f "${CHECKUP_FOLDER}/.profile" ] && [ -f "${CHECKUP_FOLDER}/.bashrc" ]; then
+    error_found=0
+    diff "${CHECKUP_FOLDER}/.profile" "${HOME}/.profile"
+    if [ $? -ne 0 ]; then
+        print_error ".profile file has changed (check changes and copy file ${HOME}/.profile to ${CHECKUP_FOLDER}/.profile)"
+        error_found=1
+    fi
+    diff "${CHECKUP_FOLDER}/.bashrc" "${HOME}/.bashrc"
+    if [ $? -ne 0 ]; then
+        print_error ".bashrc file has changed (check changes and copy file ${HOME}/.bashrc to ${CHECKUP_FOLDER}/.bashrc)"
+        error_found=1
+    fi
+
+    if [ ${error_found} -eq 0 ]; then
+        print_success "startup shells"
+    fi
+else
+    print_warning "startup shells check is skipped because reference files ${CHECKUP_FOLDER}/.profile and ${CHECKUP_FOLDER}/.bashrc do not exist"
+fi
+
 # Check files with special SUID or SGID permissions. SUID (Set User ID) and SGID (Set Group ID) are special permission bits in Linux that allow executable files
 # to run with the privileges of their owner or group instead of the user who executes them (=> potential risk of privilege escalation or unauthorized access)
 if [ -f "${CHECKUP_FOLDER}/files_with_special_SUID_or_SGID_permissions_sauv.txt" ]; then
