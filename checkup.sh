@@ -479,6 +479,14 @@ else
     print_warning "startup shells check is skipped because reference files ${CHECKUP_FOLDER}/.profile and ${CHECKUP_FOLDER}/.bashrc do not exist"
 fi
 
+# Jobs scheduled with cron (adapt this check if legitimate jobs are scheduled)
+# Note: this check should also be extended to other tools like anacron (to be done)
+scheduled_cron_jobs=$(crontab -l 2>&1 | grep -v "no crontab for")
+if [ -n "${scheduled_cron_jobs}" ]; then
+    echo ${scheduled_cron_jobs}
+    print_error "jobs are scheduled with cron"
+fi
+
 # Check files with special SUID or SGID permissions. SUID (Set User ID) and SGID (Set Group ID) are special permission bits in Linux that allow executable files
 # to run with the privileges of their owner or group instead of the user who executes them (=> potential risk of privilege escalation or unauthorized access)
 if [ -f "${CHECKUP_FOLDER}/files_with_special_SUID_or_SGID_permissions_sauv.txt" ]; then
