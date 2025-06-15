@@ -509,6 +509,7 @@ else
     echo "current PATH:  $PATH"
     print_error "PATH environment variable has changed"
 fi
+
 # Check if /usr/local/sbin and /usr/local/bin folders contain programs.
 # This check is particularly useful if those folders are at the start of PATH environment variable before /usr/sbin and /usr/bin,
 # for security reasons as they take precedence over programs installed by the system's package manager.
@@ -518,11 +519,18 @@ if ! [ -z "$file_list" ]; then
     echo $file_list
     print_error "/usr/local/sbin contains above local/manually-installed program(s)"
 fi
+EXPECTED_USR_LOCAL_BIN_PROGRAMS_INSTALLED=""
+for program in $EXPECTED_USR_LOCAL_BIN_PROGRAMS; do
+    if command -v "$program" > /dev/null 2>&1 || which "$program" > /dev/null 2>&1; then
+        EXPECTED_USR_LOCAL_BIN_PROGRAMS_INSTALLED+="$program "
+    fi
+done
+EXPECTED_USR_LOCAL_BIN_PROGRAMS_INSTALLED="${EXPECTED_USR_LOCAL_BIN_PROGRAMS_INSTALLED%"${EXPECTED_USR_LOCAL_BIN_PROGRAMS_INSTALLED##*[![:space:]]}"}"
 file_list=$(ls -A "/usr/local/bin" | tr '\n' ' ')
 file_list="${file_list%"${file_list##*[![:space:]]}"}"
-if ! [ "$file_list" == "$EXPECTED_USR_LOCAL_BIN_PROGRAMS" ]; then
+if ! [ "$file_list" == "$EXPECTED_USR_LOCAL_BIN_PROGRAMS_INSTALLED" ]; then
     echo "$file_list"
-    print_error "/usr/local/bin contains unexpected local/manually-installed program(s) among above ones"
+    print_error "above /usr/local/bin local/manually-installed program(s) are unexpected"
 fi
 
 echo
