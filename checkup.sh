@@ -139,6 +139,7 @@ elif ! [ "$XDG_SESSION_TYPE" == "wayland" ]; then
 else
     print_success "wayland session"
 fi
+
 # Check that at least one ubuntu xsession is available (useful as a backup session in case of issues with desktops other than gnome)
 ubuntu_xsessions=$(ls /usr/share/xsessions/ | grep -E "ubuntu.*\.desktop") # example of ls /usr/share/xsessions/ output: plasmax11.desktop  ubuntu-xorg.desktop  ubuntu.desktop
 if [ -z "${ubuntu_xsessions}" ]; then
@@ -160,6 +161,7 @@ echo
 echo "---------- Network check ----------"
 echo
 
+# Check network connection availability
 ping -c 1 -W 5 "www.google.com" > /dev/null 2>&1
 if [ $? -eq 0 ]; then
     print_success "network connection"
@@ -243,7 +245,9 @@ fi
 
 # Check disk encryption
 if ! $(lsblk -o NAME,KNAME,FSTYPE,TYPE,MOUNTPOINT,SIZE | grep -q "crypt"); then
-    print_warning "no disk is encrypted"
+    print_info "no disk is encrypted"
+else
+    print_success "disk encrypted"
 fi
 
 echo
@@ -364,6 +368,7 @@ echo
 echo "---------- Install check ----------"
 echo
 
+# Check repository list
 error_found=0
 unexpected_repo_urls=$(apt-cache policy | grep -oE '\bhttp[^ ]+' | grep -v 'http://security.ubuntu.com/ubuntu' | grep -v 'http://archive.ubuntu.com/ubuntu')
 if [ -n "${unexpected_repo_urls}" ]; then
@@ -398,6 +403,7 @@ else
     print_warning "repository list check is skipped because reference folder ${CHECKUP_FOLDER} does not exist"
 fi
 
+# Check software updates
 customized_file_1="/etc/apt/apt.conf.d/10periodic" # file customized via Software & Updates / Updates tab
 software_update_rate=$(cat "${customized_file_1}" | grep -E "Update-Package-Lists.*\"1\";")
 if [ -z "${software_update_rate}" ]; then
@@ -480,7 +486,7 @@ else
 fi
 
 # Jobs scheduled with cron (adapt this check if legitimate jobs are scheduled)
-# Note: this check should also be extended to other tools like anacron (to be done)
+# Note: this check should also be extended to other tools like anacron...
 scheduled_cron_jobs=$(crontab -l 2>&1 | grep -v "no crontab for")
 if [ -n "${scheduled_cron_jobs}" ]; then
     echo ${scheduled_cron_jobs}
@@ -510,15 +516,20 @@ else
     print_error "PATH environment variable has changed"
 fi
 
-# Check if /usr/local/sbin and /usr/local/bin folders contain programs.
+# Check if /usr/local/sbin and /usr/local/bin folders contents
 # This check is particularly useful if those folders are at the start of PATH environment variable before /usr/sbin and /usr/bin,
-# for security reasons as they take precedence over programs installed by the system's package manager.
-# (adapt this check if such programs are legitimate)
+# for security reasons as they take precedence over programs installed by the system's package manager
+# (adapt this check if programs in /usr/local/[s]bin folders are legitimate)
+error_found=0
+# - /usr/local/sbin
 file_list=$(ls -A "/usr/local/sbin")
 if ! [ -z "$file_list" ]; then
     echo $file_list
     print_error "/usr/local/sbin contains above local/manually-installed program(s)"
+    error_found=1
 fi
+# - /usr/local/bin
+# keep only installed apps in the list to be checked
 EXPECTED_USR_LOCAL_BIN_PROGRAMS_INSTALLED=""
 for program in $EXPECTED_USR_LOCAL_BIN_PROGRAMS; do
     if command -v "$program" > /dev/null 2>&1 || which "$program" > /dev/null 2>&1; then
@@ -531,8 +542,13 @@ file_list="${file_list%"${file_list##*[![:space:]]}"}"
 if ! [ "$file_list" == "$EXPECTED_USR_LOCAL_BIN_PROGRAMS_INSTALLED" ]; then
     echo "$file_list"
     print_error "above /usr/local/bin local/manually-installed program(s) are unexpected"
+    error_found=1
+fi
+if [ ${error_found} -eq 0 ]; then
+    print_success "/usr/local/[s]bin folders contents"
 fi
 
+# Check "apt-get check" output
 echo
 sudo apt-get check > /dev/null
 if [ $? -eq 0 ]; then
