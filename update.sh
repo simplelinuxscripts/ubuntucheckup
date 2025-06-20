@@ -12,7 +12,7 @@ GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 RED='\033[0;31m'
 BOLD=$'\E[1m'
-NC='\033[0m'
+NC=$'\E[0m'
 
 print_success() {
     success_str="$1"
@@ -36,19 +36,30 @@ if [ $? -ne 0 ]; then
     exit 1
 fi
 
-# check if some snap packages could be updated manually (before default automatic snap updates)
+# Check if snap packages
+echo "Checking snap packages..."
+echo "snap refresh times:"
+snap refresh --time | sed "/yesterday/s/.*/${BOLD}&${NC}/" | sed "/today/s/.*/${BOLD}&${NC}/" | sed "/tomorrow/s/.*/${BOLD}&${NC}/" | sed 's/^/  /'
+snap_packages_that_can_be_updated=$(sudo snap refresh --list 2>&1 | grep -v "All snaps up to date")
 # example:
 #   sudo snap refresh --list
 #   Name      Version         Rev   Size   Publisher   Notes
 #   chromium  133.0.6943.141  3051  185MB  canonical✓  -
-snap_packages_that_can_be_updated=$(sudo snap refresh --list 2>&1 | grep -v "All snaps up to date")
 if [ -n "${snap_packages_that_can_be_updated}" ]; then
     echo "${snap_packages_that_can_be_updated}"
     print_warning "above snap packages could be updated manually instead of automatically by default ('sudo snap refresh' to be run after having closed the applications, then 'snap refresh --list' for check)"
-    read -p "Press Enter to continue..."
-    echo
 fi
+read -p "Press Enter to continue..."
+echo
 
+# Check logs of last unattended-upgrades automatic runs
+echo "Checking unattended-upgrades..."
+echo "Updates allowed to be applied automatically by unattended-upgrades: (see Discover for wider set of updates)"
+less /var/log/unattended-upgrades/unattended-upgrades.log | tail -35 | sed "/ERROR/s/.*/${BOLD}&${NC}/" | sed "/INFO No packages found/s/.*/${BOLD}&${NC}/" | sed "/INFO All upgrades installed/s/.*/${BOLD}&${NC}/" | sed 's/^/  /'
+read -p "Press Enter to continue..."
+echo
+
+# Manual updates
 echo "Running apt update..."
 sudo apt update
 if [ $? -ne 0 ]; then

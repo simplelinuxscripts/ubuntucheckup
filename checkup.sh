@@ -22,20 +22,32 @@ STOP_ON_WARNINGS=0
 STOP_ON_ERRORS=0
 TEST_SUDO_PWD=1
 
-# Example of output of lsblk command:
-# NAME                        MAJ:MIN RM   SIZE RO TYPE  MOUNTPOINTS
-# loop0                         7:0    0  74.2M  1 loop  /snap/core22/1380
-# loop1                         7:1    0     4K  1 loop  /snap/bare/5
-# loop2                         7:2    0 269.6M  1 loop  /snap/firefox/4173
-# ...
-# loop16                        7:16   0  10.7M  1 loop  /snap/snap-store/1218
-# nvme0n1                     259:0    0 476.9G  0 disk
-# ├─nvme0n1p1                 259:1    0     1G  0 part  /boot/efi
-# ├─nvme0n1p2                 259:2    0     2G  0 part  /boot
-# └─nvme0n1p3                 259:3    0 473.9G  0 part
-#  └─dm_crypt-0              252:0    0 473.9G  0 crypt
-#    └─ubuntu--vg-ubuntu--lv 252:1    0 473.9G  0 lvm    /
-# => disk device for root folder is nvme0n1 => HARD_DISK_DEVICE set to "/dev/nvme0n1"
+# Guidelines to fill HARD_DISK_DEVICE parameter:
+# - Example #1: output of lsblk command is:
+#   NAME   MAJ:MIN RM   SIZE RO TYPE MOUNTPOINTS
+#   loop0    7:0    0     4K  1 loop /snap/bare/5
+#   loop1    7:1    0 182.8M  1 loop /snap/chromium/3169
+#   ...
+#   sda      8:0    0 232.9G  0 disk 
+#   |-sda1   8:1    0     1G  0 part /boot/efi
+#   `-sda2   8:2    0 231.8G  0 part /var/snap/firefox/common/host-hunspell
+#                                    /
+#   => disk device for root folder is sda
+#   => HARD_DISK_DEVICE shall be set to "/dev/sda"
+# Example #2: output of lsblk command is:
+#   NAME                        MAJ:MIN RM   SIZE RO TYPE  MOUNTPOINTS
+#   loop0                         7:0    0  74.2M  1 loop  /snap/core22/1380
+#   loop1                         7:1    0     4K  1 loop  /snap/bare/5
+#   ...
+#   loop16                        7:16   0  10.7M  1 loop  /snap/snap-store/1218
+#   nvme0n1                     259:0    0 476.9G  0 disk
+#   ├─nvme0n1p1                 259:1    0     1G  0 part  /boot/efi
+#   ├─nvme0n1p2                 259:2    0     2G  0 part  /boot
+#   └─nvme0n1p3                 259:3    0 473.9G  0 part
+#     └─dm_crypt-0              252:0    0 473.9G  0 crypt
+#       └─ubuntu--vg-ubuntu--lv 252:1    0 473.9G  0 lvm    /
+#   => disk device for root folder is nvme0n1
+#   => HARD_DISK_DEVICE shall be set to "/dev/nvme0n1"
 HARD_DISK_DEVICE="/dev/nvme0n1"
 
 # Firefox snap settings folder
@@ -50,7 +62,7 @@ SNAP_CHROMIUM_FOLDER="${SNAP_FOLDER}/chromium/common/chromium/Default"
 EXPECTED_PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games:/usr/local/games:/snap/bin:${HOME}/DOCUMENTS/Informatique/Programmes/Linux:${HOME}/DOCUMENTS/Informatique/Programmes/Linux/simplelinuxscripts/findlines:${HOME}/DOCUMENTS/Informatique/Programmes/Linux/simplelinuxscripts/ubuntucheckup"
 
 # Expected program(s) in /usr/local/bin if any, "" if none
-EXPECTED_USR_LOCAL_BIN_PROGRAMS="dragon gwenview kate obs"
+EXPECTED_USR_LOCAL_BIN_PROGRAMS="obs"
 
 # Optional: folder used to save a copy of some important configuration files
 #           and therefore be able to regularly check that they were not modified
@@ -125,6 +137,28 @@ else
     print_warning "sudo password check is skipped"
 fi
 
+# Check sudoers
+if [ -d "${CHECKUP_FOLDER}/etc/sudoers.d" ]; then
+    error_found=0
+    # Note: the command to edit /etc/sudoers file would be visudo
+    sudo diff -w "${CHECKUP_FOLDER}/etc/sudoers" "/etc/sudoers"
+    if [ $? -ne 0 ]; then
+        print_error "sudoers have changed in /etc/sudoers (check changes and copy file /etc/sudoers to ${CHECKUP_FOLDER}/etc/sudoers)"
+        error_found=1
+    fi
+    sudo diff -rU 0 --exclude="*.save" "${CHECKUP_FOLDER}/etc/sudoers.d" "/etc/sudoers.d"
+    if [ $? -ne 0 ]; then
+        print_error "sudoers have changed in /etc/sudoers.d (check changes and copy folder /etc/sudoers.d to ${CHECKUP_FOLDER}/etc/sudoers.d)"
+        error_found=1
+    fi
+
+    if [ ${error_found} -eq 0 ]; then
+        print_success "sudoers"
+    fi
+else
+    print_warning "sudoers check is skipped because reference folder ${CHECKUP_FOLDER}/etc/sudoers.d does not exist"
+fi
+
 echo
 echo "---------- Session check ----------"
 echo
@@ -149,7 +183,8 @@ else
 fi
 
 # Check if sessions were opened by other users
-sessions_opened_by_other_users=$(journalctl -u systemd-logind --no-pager | grep -i "New session" | grep -v "$(whoami)." | grep -v "user sddm.")
+# (gdm stands for GNOME Display Manager)
+sessions_opened_by_other_users=$(journalctl -u systemd-logind --no-pager | grep -i "New session" | grep -v "$(whoami)." | grep -v "user gdm." | grep -v "user sddm.")
 if [ -n "$sessions_opened_by_other_users" ]; then
     echo "$sessions_opened_by_other_users" | awk '{print $NF}' | sort | uniq
     print_warning "sessions were opened by above other user(s)"
@@ -228,51 +263,47 @@ else
     print_success "disk usage ($usage%)"
 fi
 
+disk_size=$(lsblk -d -o SIZE "${HARD_DISK_DEVICE}" | tail -1)
+if [[ "$disk_size" != *G && "$disk_size" != *T ]]; then # G for giga, T for Tera are valid disk sizes
+    print_error "disk size error (have you set HARD_DISK_DEVICE script parameter correctly?) $disk_size"
+fi
 disk_status=$(sudo smartctl -a "${HARD_DISK_DEVICE}")
-if echo "${disk_status}" | grep -i -E 'FAIL|error|Reallocated_Sector_Ct|Current_Pending_Sector|Offline_Uncorrectable|Bad|Uncorrectable|Unable' | grep -v "Media and Data Integrity Errors:    0" | grep -v "Error Information" | grep -v "No Errors Logged"; then
-    print_error "disk errors detected, see above"
-elif ! $(echo "${disk_status}" | grep -q "SMART overall-health self-assessment test result: PASSED"); then
+if ! $(echo "${disk_status}" | grep -q "SMART overall-health self-assessment test result: PASSED"); then
     print_error "disk errors detected (test result)"
 elif ! $(echo "${disk_status}" | grep -q "No Errors Logged"); then
     print_error "disk errors detected (errors logged)"
-elif ! $(echo "${disk_status}" | grep -q "Critical Warning:                   0x00"); then
+elif $(echo "${disk_status}" | grep -q -E "Critical Warning.*[1-9][0-9]*$"); then
     print_error "disk errors detected (critical warnings)"
-elif ! $(echo "${disk_status}" | grep -q "Media and Data Integrity Errors:    0"); then
+elif $(echo "${disk_status}" | grep -q -E "Media and Data Integrity Errors.*[1-9][0-9]*$"); then
     print_error "disk errors detected (media and data integrity)"
 else
-    print_success "disk health"
+    filtered_disk_status=$(echo "${disk_status}" | grep -E 'FAIL|ERROR|error|Reallocated_Sector_Ct.*[1-9][0-9]*$|Used_Rsvd_Blk_Cnt_Tot.*[1-9][0-9]*$|Program_Fail_Cnt_Total.*[1-9][0-9]*$|Erase_Fail_Count_Total.*[1-9][0-9]*$|Runtime_Bad_Block.*[1-9][0-9]*$|Uncorrectable_Error_Cnt.*[1-9][0-9]*$|ECC_Error_Rate.*[1-9][0-9]*$|CRC_Error_Count.*[1-9][0-9]*$|Current_Pending_Sector|Offline_Uncorrectable|Unable' | grep -v "Media and Data Integrity Errors:    0" | grep -v "Error Information" | grep -v "No Errors Logged" | grep -v "without error" | grep -v "WHEN_FAILED" | grep -v "LBA_of_first_error" | grep -v "Error Recovery Control supported" | grep -v "Error logging supported")
+    if [ -n "${filtered_disk_status}" ]; then
+        echo "${filtered_disk_status}"
+        filtered_errors=$(echo "${filtered_disk_status}" | grep -v -i "warning")
+        if [ -n "${filtered_errors}" ]; then
+            print_error "disk errors detected, see above"
+        else
+            print_warning "disk warnings detected, see above"
+        fi
+    else
+        print_success "disk health"
+    fi
 fi
 
 # Check disk encryption
 if ! $(lsblk -o NAME,KNAME,FSTYPE,TYPE,MOUNTPOINT,SIZE | grep -q "crypt"); then
     print_info "no disk is encrypted"
-else
-    print_success "disk encrypted"
 fi
 
 echo
 echo "---------- Runtime check ----------"
 echo
 
-# Check errors in system logs
-today_date=$(date +"%Y-%m-%d")
-one_day_ago_date=$(date -d "yesterday" +"%Y-%m-%d")
-two_days_ago_date=$(date -d "2 days ago" +"%Y-%m-%d")
-three_days_ago_date=$(date -d "3 days ago" +"%Y-%m-%d")
-four_days_ago_date=$(date -d "4 days ago" +"%Y-%m-%d")
-five_days_ago_date=$(date -d "5 days ago" +"%Y-%m-%d")
-six_days_ago_date=$(date -d "6 days ago" +"%Y-%m-%d")
-seven_days_ago_date=$(date -d "7 days ago" +"%Y-%m-%d")
-if ! [[ -e /var/log/syslog && -e /var/log/kern.log && -e /var/log/auth.log ]]; then # same list of files as below
-    print_warning "some system logs files to be checked are missing"
-fi
-serious_errors_in_system_logs=$(more /var/log/syslog /var/log/kern.log /var/log/auth.log | grep -iP "$today_date|$one_day_ago_date|$two_days_ago_date|$three_days_ago_date|$four_days_ago_date|$five_days_ago_date|$six_days_ago_date|$seven_days_ago_date" | grep -iv "not severe" | grep -iv "not critical" | grep -iv "not fatal" | grep -iP --color=always "severe|critical|fatal|alert|emergency|panic|segfault")
-if [ "${serious_errors_in_system_logs}" == "" ]; then
-    print_success "system logs"
-else
-    echo "$serious_errors_in_system_logs"
-    print_warning "above errors were found in system logs"
-fi
+# Collect errors from journalctl (journalctl priorities: "emerg" (0), "alert" (1), "crit" (2), "err" (3), "warning" (4), "notice" (5), "info" (6), "debug" (7))
+print_info "most frequent critical errors:"
+journalctl -p 0..2 --since "7 days ago" > /tmp/journalctl_errors.log
+grep -oP '(?<=: ).*' /tmp/journalctl_errors.log | sed 's/for [0-9]*s/for XXs/g' | grep -v "password is required" | sort | uniq -c | sort -nr  | head -25 | awk '{$1=$1; print}' | sed 's/^/      /'
 
 # Detect processes that are still executing after their executable files have been removed (suspicious processes)
 find /proc/*/exe -lname '*(deleted)' 2>/dev/null | while read -r exe; do
@@ -376,10 +407,10 @@ if [ -n "${unexpected_repo_urls}" ]; then
     print_error "above repository URLs are unexpected"
     error_found=1
 fi
-if [ -d "${CHECKUP_FOLDER}" ]; then
+if [ -d "${CHECKUP_FOLDER}/etc/apt/sources.list.d" ]; then
     diff "${CHECKUP_FOLDER}/etc/apt/sources.list" "/etc/apt/sources.list"
     if [ $? -ne 0 ]; then
-        print_error "repository list has changed in /etc/apt/sources.list"
+        print_error "repository list has changed in /etc/apt/sources.list (check changes and copy file /etc/apt/sources.list to ${CHECKUP_FOLDER}/etc/apt/sources.list)"
         error_found=1
     fi
 
@@ -400,11 +431,13 @@ if [ -d "${CHECKUP_FOLDER}" ]; then
         print_success "repository list"
     fi
 else
-    print_warning "repository list check is skipped because reference folder ${CHECKUP_FOLDER} does not exist"
+    print_warning "repository list check is skipped because reference folder ${CHECKUP_FOLDER}/etc/apt/sources.list.d does not exist"
 fi
 
 # Check software updates
 customized_file_1="/etc/apt/apt.conf.d/10periodic" # file customized via Software & Updates / Updates tab
+customized_file_2="/etc/apt/apt.conf.d/20auto-upgrades" # file customized via Software & Updates / Updates tab
+customized_file_3="/etc/apt/apt.conf.d/50unattended-upgrades" # file customized manually if needed (e.g. to make upgrades automatic)
 software_update_rate=$(cat "${customized_file_1}" | grep -E "Update-Package-Lists.*\"1\";")
 if [ -z "${software_update_rate}" ]; then
     print_error "software update rate is not daily (can be updated in 'Software & Updates / Updates tab')"
@@ -420,9 +453,19 @@ if [ -n "$download_upgradeable_packages_1" ] && [ -n "$unattended_upgrade" ]; th
 fi
 if [ -d "${CHECKUP_FOLDER}/etc/apt/apt.conf.d" ]; then
     error_found=0
-    diff "${CHECKUP_FOLDER}/etc/apt/apt.conf.d/10periodic" ${customized_file_1}
+    diff "${CHECKUP_FOLDER}$customized_file_1" ${customized_file_1}
     if [ $? -ne 0 ]; then
-        print_error "software update parameters have changed (${customized_file_1})"
+        print_error "software update parameters have changed (check changes and copy file ${customized_file_1} to ${CHECKUP_FOLDER}$customized_file_1)"
+        error_found=1
+    fi
+    diff "${CHECKUP_FOLDER}$customized_file_2" ${customized_file_2}
+    if [ $? -ne 0 ]; then
+        print_error "software auto-upgrades parameters have changed (check changes and copy file ${customized_file_2} to ${CHECKUP_FOLDER}$customized_file_2)"
+        error_found=1
+    fi
+    diff "${CHECKUP_FOLDER}$customized_file_3" ${customized_file_3}
+    if [ $? -ne 0 ]; then
+        print_error "software unattended-upgrades parameters have changed (check changes and copy file ${customized_file_3} to ${CHECKUP_FOLDER}$customized_file_3)"
         error_found=1
     fi
 
@@ -438,7 +481,7 @@ if [ -d "${CHECKUP_FOLDER}/.config/autostart" ]; then
     error_found=0
     diff -rU 0 "${CHECKUP_FOLDER}/.config/autostart" "${HOME}/.config/autostart/"
     if [ $? -ne 0 ]; then
-        print_error "startup applications have changed (${HOME}/.config/autostart)"
+        print_error "startup applications have changed (check changes and copy file ${HOME}/.config/autostart/ to ${CHECKUP_FOLDER}/.config/autostart)"
         error_found=1
     fi
 
@@ -451,9 +494,9 @@ fi
 if [ -f "${CHECKUP_FOLDER}/systemctl_services_enabled_sauv.txt" ]; then
     error_found=0
     systemctl list-unit-files --type=service --state=enabled > "${CHECKUP_FOLDER}/systemctl_services_enabled_current.txt"
-    diff "${CHECKUP_FOLDER}/systemctl_services_enabled_sauv.txt" "${CHECKUP_FOLDER}/systemctl_services_enabled_current.txt"
+    diff -w "${CHECKUP_FOLDER}/systemctl_services_enabled_sauv.txt" "${CHECKUP_FOLDER}/systemctl_services_enabled_current.txt"
     if [ $? -ne 0 ]; then
-        print_error "startup services have changed"
+        print_error "startup services have changed (check changes and copy file ${CHECKUP_FOLDER}/systemctl_services_enabled_current.txt to ${CHECKUP_FOLDER}/systemctl_services_enabled_sauv.txt)"
         error_found=1
     fi
 
@@ -497,7 +540,7 @@ fi
 # to run with the privileges of their owner or group instead of the user who executes them (=> potential risk of privilege escalation or unauthorized access)
 if [ -f "${CHECKUP_FOLDER}/files_with_special_SUID_or_SGID_permissions_sauv.txt" ]; then
     sudo find / -type f \( -perm -4000 -o -perm -2000 \) -exec ls {} \; 2> /dev/null | grep -v "/snap/" > "${CHECKUP_FOLDER}/files_with_special_SUID_or_SGID_permissions_current.txt"
-    diff "${CHECKUP_FOLDER}/files_with_special_SUID_or_SGID_permissions_sauv.txt" "${CHECKUP_FOLDER}/files_with_special_SUID_or_SGID_permissions_current.txt"
+    diff <(sort "${CHECKUP_FOLDER}/files_with_special_SUID_or_SGID_permissions_sauv.txt") <(sort "${CHECKUP_FOLDER}/files_with_special_SUID_or_SGID_permissions_current.txt")
     if [ $? -ne 0 ]; then
         print_error "list of files with special SUID or SGID permissions has changed (check changes and copy file ${CHECKUP_FOLDER}/files_with_special_SUID_or_SGID_permissions_current.txt to ${CHECKUP_FOLDER}/files_with_special_SUID_or_SGID_permissions_sauv.txt)"
     else
@@ -540,6 +583,9 @@ EXPECTED_USR_LOCAL_BIN_PROGRAMS_INSTALLED="${EXPECTED_USR_LOCAL_BIN_PROGRAMS_INS
 file_list=$(ls -A "/usr/local/bin" | tr '\n' ' ')
 file_list="${file_list%"${file_list##*[![:space:]]}"}"
 if ! [ "$file_list" == "$EXPECTED_USR_LOCAL_BIN_PROGRAMS_INSTALLED" ]; then
+    if [ -z "${file_list}" ]; then
+        file_list="(none)"
+    fi
     echo "$file_list"
     print_error "above /usr/local/bin local/manually-installed program(s) are unexpected"
     error_found=1
@@ -692,7 +738,7 @@ if [ -d "${SNAP_CHROMIUM_FOLDER}" ]; then
     # Chromium settings
     chromium_safebrowing_enabled=$(more "${SNAP_CHROMIUM_FOLDER}/Preferences" | grep -oE '"safebrowsing":{[^}]*}' | grep "\"enabled\":true")
     if [ -z "${chromium_safebrowing_enabled}" ]; then
-        print_error "chromium browsing is not safe"
+        print_error "chromium browsing is not safe (disabling and then reenabling safe browsing in Chromium settings - Privacy and security - Security can make this check work)"
         error_found=1
     fi
     chromium_always_use_secure_connections_enabled=$(more "${SNAP_CHROMIUM_FOLDER}/Preferences" | grep "\"https_only_mode_enabled\":true")
@@ -733,8 +779,8 @@ echo "checking package files storage..."
 # - Errors like "missing     /usr/share/icons/LoginIcons" can be corrected by:
 # 1) dpkg -S /usr/share/icons/LoginIcons => package name is displayed like "ubuntu-mono: /usr/share/icons/LoginIcons"
 # 2) sudo apt reinstall ubuntu-mono => this command reinstalls the faulty package
-# - When errors cannot be avoided for some files, grep -v is piped to below command
-dpkg_verify_status=$(sudo dpkg --verify | grep -v "/etc/apt/apt.conf.d/10periodic" | grep -v "/etc/cloud/templates/sources.list.debian.deb822.tmpl" | grep -v "/etc/cloud/templates/sources.list.ubuntu.deb822.tmpl" | grep -v "/etc/xdg/libkleopatrarc" )
+# - When difference detection cannot be avoided or is normal for some files, grep -v is piped to below command
+dpkg_verify_status=$(sudo dpkg --verify | grep -v "/etc/apt/apt.conf.d/10periodic" | grep -v "/etc/cloud/templates/sources.list.debian.deb822.tmpl" | grep -v "/etc/cloud/templates/sources.list.ubuntu.deb822.tmpl" | grep -v "/etc/xdg/libkleopatrarc" | grep -v "/etc/update-manager/release-upgrades" )
 if [ -n "${dpkg_verify_status}" ]; then
     echo "${dpkg_verify_status}"
     print_error "errors in package files storage, possibly due to manual updates, file corruptions, file system errors on disk, see above (package reinstallation or package file restoration may be needed)"
@@ -776,7 +822,7 @@ if [ ${EXTENDED_CHECKS} -eq 0 ]; then
 
         # Package and service management
         "/usr/bin/systemctl" "/usr/bin/journalctl" "/usr/bin/dpkg" "/usr/bin/rpm"
-        "/usr/bin/yum" "/usr/bin/apt" "/usr/bin/apt-get"
+        "/usr/bin/yum" "/usr/bin/apt" "/usr/bin/apt-get" "/usr/bin/apt-mark" "/usr/bin/snap"
 
         # SSH and remote access
         "/usr/bin/ssh" "/usr/sbin/sshd" "/usr/bin/scp" "/usr/bin/sftp"
@@ -789,6 +835,9 @@ if [ ${EXTENDED_CHECKS} -eq 0 ]; then
 
         # Misc
         "/usr/bin/env" "/usr/bin/xargs" "/usr/bin/awk" "/usr/bin/sed"
+        "/usr/bin/diff" "/usr/bin/vi" "/usr/sbin/ufw" "/usr/sbin/smartctl"
+        "/usr/sbin/aa-status" "/usr/bin/cp" "/usr/bin/more" "/usr/bin/less"
+        "/usr/bin/cat"
     )
     for bin in "${critical_bins[@]}"; do
         if [[ -f "$bin" ]]; then
