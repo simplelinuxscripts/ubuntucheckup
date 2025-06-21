@@ -48,13 +48,17 @@ snap_packages_that_can_be_updated=$(sudo snap refresh --list 2>&1 | grep -v "All
 if [ -n "${snap_packages_that_can_be_updated}" ]; then
     echo "${snap_packages_that_can_be_updated}"
     print_warning "above snap packages could be updated manually instead of automatically by default ('sudo snap refresh' to be run after having closed the applications, then 'snap refresh --list' for check)"
+else
+    print_success "snap packages are up-to-date"
 fi
 read -p "Press Enter to continue..."
 echo
 
 # Check logs of last unattended-upgrades automatic runs
 echo "Checking unattended-upgrades..."
-echo "Updates allowed to be applied automatically by unattended-upgrades: (Note: \"apt\" will detect wider set of updates)"
+echo "timers:"
+systemctl list-timers apt-daily.timer apt-daily-upgrade.timer | head -n 3
+echo "updates allowed to be applied automatically by unattended-upgrades: (Note: \"apt\" will detect wider set of updates)"
 less /var/log/unattended-upgrades/unattended-upgrades.log | tail -35 | sed "/ERROR/s/.*/${BOLD}&${NC}/" | sed "/INFO No packages found/s/.*/${BOLD}&${NC}/" | sed "/INFO All upgrades installed/s/.*/${BOLD}&${NC}/" | sed 's/^/  /'
 read -p "Press Enter to continue..."
 echo
