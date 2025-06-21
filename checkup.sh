@@ -48,21 +48,21 @@ TEST_SUDO_PWD=1
 #       └─ubuntu--vg-ubuntu--lv 252:1    0 473.9G  0 lvm    /
 #   => disk device for root folder is nvme0n1
 #   => HARD_DISK_DEVICE shall be set to "/dev/nvme0n1"
-HARD_DISK_DEVICE="/dev/xxx"
+HARD_DISK_DEVICE="/dev/nvme0n1"
 
 # Firefox snap settings folder
 SNAP_FOLDER="${HOME}/snap"
 SNAP_FIREFOX_FOLDER="${SNAP_FOLDER}/firefox/common/.mozilla/firefox"
-SNAP_FIREFOX_PROFILE_FOLDER="${SNAP_FIREFOX_FOLDER}/xxxxxxxx.default"
+SNAP_FIREFOX_PROFILE_FOLDER="${SNAP_FIREFOX_FOLDER}/mnu864hu.default"
 
 # Chromimum snap settings folder
 SNAP_CHROMIUM_FOLDER="${SNAP_FOLDER}/chromium/common/chromium/Default"
 
 # Expected PATH environment variable value (any change of PATH environment variable will be detected)
-EXPECTED_PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games:/usr/local/games:/snap/bin"
+EXPECTED_PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games:/usr/local/games:/snap/bin:${HOME}/DOCUMENTS/Informatique/Programmes/Linux:${HOME}/DOCUMENTS/Informatique/Programmes/Linux/simplelinuxscripts/findlines:${HOME}/DOCUMENTS/Informatique/Programmes/Linux/simplelinuxscripts/ubuntucheckup"
 
 # Expected program(s) in /usr/local/bin if any, "" if none
-EXPECTED_USR_LOCAL_BIN_PROGRAMS=""
+EXPECTED_USR_LOCAL_BIN_PROGRAMS="obs"
 
 # Optional: folder used to save a copy of some important configuration files
 #           and therefore be able to regularly check that they were not modified
@@ -777,9 +777,9 @@ echo
 echo "checking package files storage..."
 # - Possible error observed at sudo dpkg --verify execution: ??5?????? c /etc/apt/apt.conf.d/10periodic (means that properties in this file don't match the package's expectations, typically following customization via Software & Updates / Updates tab) => ignored because /etc/apt/apt.conf.d/10periodic file contents were already checked above
 # - Errors like "missing     /usr/share/icons/LoginIcons" can be corrected by:
-# 1) dpkg -S /usr/share/icons/LoginIcons => package name is displayed like "ubuntu-mono: /usr/share/icons/LoginIcons"
-# 2) sudo apt reinstall ubuntu-mono => this command reinstalls the faulty package
-# - When difference detection cannot be avoided or is normal for some files, grep -v is piped to below command
+#   1) dpkg -S /usr/share/icons/LoginIcons => package name is displayed like "ubuntu-mono: /usr/share/icons/LoginIcons"
+#   2) sudo apt reinstall ubuntu-mono => this command reinstalls the faulty package
+# - When difference cannot be avoided by reinstalling source package or is normal due to customization, grep -v is piped to below command
 dpkg_verify_status=$(sudo dpkg --verify | grep -v "/etc/apt/apt.conf.d/10periodic" | grep -v "/etc/cloud/templates/sources.list.debian.deb822.tmpl" | grep -v "/etc/cloud/templates/sources.list.ubuntu.deb822.tmpl" | grep -v "/etc/xdg/libkleopatrarc" | grep -v "/etc/update-manager/release-upgrades" )
 if [ -n "${dpkg_verify_status}" ]; then
     echo "${dpkg_verify_status}"

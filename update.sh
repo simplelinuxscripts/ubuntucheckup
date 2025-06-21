@@ -54,7 +54,7 @@ echo
 
 # Check logs of last unattended-upgrades automatic runs
 echo "Checking unattended-upgrades..."
-echo "Updates allowed to be applied automatically by unattended-upgrades: (see Discover for wider set of updates)"
+echo "Updates allowed to be applied automatically by unattended-upgrades: (Note: \"apt\" will detect wider set of updates)"
 less /var/log/unattended-upgrades/unattended-upgrades.log | tail -35 | sed "/ERROR/s/.*/${BOLD}&${NC}/" | sed "/INFO No packages found/s/.*/${BOLD}&${NC}/" | sed "/INFO All upgrades installed/s/.*/${BOLD}&${NC}/" | sed 's/^/  /'
 read -p "Press Enter to continue..."
 echo
