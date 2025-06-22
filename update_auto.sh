@@ -40,6 +40,9 @@ echo -e "${BOLD}********************${NC}"
 echo -e "${BOLD}AUTOMATIC UPDATES...${NC}"
 echo -e "${BOLD}********************${NC}"
 
+echo
+read -p "Press Enter to continue..."
+
 ping -c 1 -W 5 "www.google.com" > /dev/null 2>&1
 if [ $? -ne 0 ]; then
     print_error "no network connection detected. Connect to internet and rerun the script."
