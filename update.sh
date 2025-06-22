@@ -1,10 +1,10 @@
 #!/bin/bash
 
-############################
+###############################
 #
 # Ubuntu packages update script
 #
-############################
+###############################
 
 export LC_ALL=en_US.UTF-8
 
@@ -47,7 +47,7 @@ snap_packages_that_can_be_updated=$(sudo snap refresh --list 2>&1 | grep -v "All
 #   chromium  133.0.6943.141  3051  185MB  canonical✓  -
 if [ -n "${snap_packages_that_can_be_updated}" ]; then
     echo "${snap_packages_that_can_be_updated}"
-    print_warning "above snap packages could be updated manually instead of automatically by default ('sudo snap refresh' to be run after having closed the applications, then 'snap refresh --list' for check)"
+    print_warning "above snap packages could be updated manually instead of automatically by default ('sudo snap refresh' to be run after having closed the applications, then 'snap refresh --list' for check / logs can also be checked with 'journalctl -u snapd' if needed)"
 else
     print_success "snap packages are up-to-date"
 fi
@@ -59,7 +59,7 @@ echo "Checking unattended-upgrades..."
 echo "timers:"
 systemctl list-timers apt-daily.timer apt-daily-upgrade.timer | head -n 3
 echo "updates allowed to be applied automatically by unattended-upgrades: (Note: \"apt\" will detect wider set of updates)"
-less /var/log/unattended-upgrades/unattended-upgrades.log | tail -35 | sed "/ERROR/s/.*/${BOLD}&${NC}/" | sed "/INFO No packages found/s/.*/${BOLD}&${NC}/" | sed "/INFO All upgrades installed/s/.*/${BOLD}&${NC}/" | sed 's/^/  /'
+less /var/log/unattended-upgrades/unattended-upgrades.log | grep -v "whitelist" | grep -v "blacklist" | tail -44 | sed "/ERROR/s/.*/${BOLD}&${NC}/" | sed "/INFO No packages found/s/.*/${BOLD}&${NC}/" | sed "/INFO All upgrades installed/s/.*/${BOLD}&${NC}/" | sed 's/^/  /'
 read -p "Press Enter to continue..."
 echo
 
