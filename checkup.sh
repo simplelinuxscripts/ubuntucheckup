@@ -477,6 +477,8 @@ else
 fi
 
 # Check startup applications and services
+# system-wide autostart folder: /etc/xdg/autostart: not checked (contains for example update-notifier.desktop, snap-userd-autostart.desktop, org.kde.discover.notifier.desktop)
+# user-specific autostart folder: ~/.config/autostart
 if [ -d "${CHECKUP_FOLDER}/.config/autostart" ]; then
     error_found=0
     diff -rU 0 "${CHECKUP_FOLDER}/.config/autostart" "${HOME}/.config/autostart/"
