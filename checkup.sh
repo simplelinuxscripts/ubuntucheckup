@@ -1065,7 +1065,7 @@ fi
 snap_package_urls=$(echo "$snap_package_info" | grep 'store-url')
 snap_packages_with_unexpected_urls=$(echo "${snap_package_urls}" | grep -v 'https://snapcraft.io/')
 if [ -z "${snap_package_urls}" ]; then
-    print_warning "no store-url found in snap packages info (this error can appear if no network connection)"
+    print_warning "no store-url found in snap packages info (this warning can appear if no network connection)"
     snap_error_found=1
 elif [ -n "${snap_packages_with_unexpected_urls}" ]; then
     echo "${snap_packages_with_unexpected_urls}"
