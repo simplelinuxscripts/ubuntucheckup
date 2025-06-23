@@ -1054,23 +1054,42 @@ fi
 snap_package_info=$(snap list --all | awk 'NR>1 {print $1}' | while read snap; do echo "$snap: $(snap info --verbose $snap)"; done)
 snap_package_confinements=$(echo "$snap_package_info" | grep 'confinement')
 snap_packages_with_non_strict_confinement=$(echo "${snap_package_confinements}" | grep -v 'strict')
-if [ -n "${snap_packages_with_non_strict_confinement}" ]; then
+if [ -z "${snap_package_confinements}" ]; then
+    print_error "no confinement found in snap packages info"
+    snap_error_found=1
+elif [ -n "${snap_packages_with_non_strict_confinement}" ]; then
     echo "${snap_packages_with_non_strict_confinement}"
     print_error "some snap packages are not installed with strict confinement"
     snap_error_found=1
 fi
 snap_package_urls=$(echo "$snap_package_info" | grep 'store-url')
 snap_packages_with_unexpected_urls=$(echo "${snap_package_urls}" | grep -v 'https://snapcraft.io/')
-if [ -n "${snap_packages_with_unexpected_urls}" ]; then
+if [ -z "${snap_package_urls}" ]; then
+    print_error "no store-url found in snap packages info (this error can appear if no network connection)"
+    snap_error_found=1
+elif [ -n "${snap_packages_with_unexpected_urls}" ]; then
     echo "${snap_packages_with_unexpected_urls}"
     print_error "some snap packages are installed from an unexpected URL (this error can appear if no network connection)"
     snap_error_found=1
 fi
 snap_package_licenses=$(echo "$snap_package_info" | grep 'license:')
 snap_packages_with_unexpected_licenses=$(echo "${snap_package_licenses}" | grep -v 'unset' | grep -v 'GPL' | grep -v 'MIT') # "license:   Proprietary" will be detected
-if [ -n "${snap_packages_with_unexpected_licenses}" ]; then
+if [ -z "${snap_package_licenses}" ]; then
+    print_error "no license found in snap packages info"
+    snap_error_found=1
+elif [ -n "${snap_packages_with_unexpected_licenses}" ]; then
     echo "${snap_packages_with_unexpected_licenses}"
     print_error "some snap packages are installed with an unexpected license"
+    snap_error_found=1
+fi
+snap_package_trackings=$(echo "$snap_package_info" | grep 'tracking:')
+snap_packages_with_unexpected_trackings=$(echo "${snap_package_trackings}" | grep -v 'stable')
+if [ -z "${snap_package_trackings}" ]; then
+    print_error "no tracking found in snap packages info"
+    snap_error_found=1
+elif [ -n "${snap_packages_with_unexpected_trackings}" ]; then
+    echo "${snap_packages_with_unexpected_trackings}"
+    print_error "some snap packages are not installed from stable channel"
     snap_error_found=1
 fi
 if snap saved | grep -v "No snapshots found."; then
