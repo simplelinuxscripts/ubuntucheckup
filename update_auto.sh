@@ -41,7 +41,10 @@ echo -e "${BOLD}AUTOMATIC UPDATES...${NC}"
 echo -e "${BOLD}********************${NC}"
 
 echo
-read -p "Press Enter to continue..."
+read -p "Close all apps and press Enter to continue..."
+
+pkill -f firefox 2> /dev/null
+pkill -f chromium 2> /dev/null
 
 ping -c 1 -W 5 "www.google.com" > /dev/null 2>&1
 if [ $? -ne 0 ]; then

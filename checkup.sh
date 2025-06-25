@@ -1092,6 +1092,67 @@ elif [ -n "${snap_packages_with_unexpected_trackings}" ]; then
     print_error "some snap packages are not installed from stable channel"
     snap_error_found=1
 fi
+
+check_snap_refresh_date() {
+    package_name="$1"
+
+    refresh_date=$(snap info "$package_name" | grep "refresh-date")
+
+    if [[ $refresh_date =~ "a month ago" ]]; then
+        days=30
+    elif [[ $refresh_date =~ "a year ago" ]]; then
+        days=365
+    elif [[ $refresh_date =~ "a week ago" ]]; then
+        days=7
+    elif [[ $refresh_date =~ ([0-9]+)\ ([a-zA-Z]+) ]]; then
+        num=${BASH_REMATCH[1]}
+        unit=${BASH_REMATCH[2]}
+
+        case $unit in
+            day|days)
+                days=$num
+                ;;
+            week|weeks)
+                days=$((num * 7))
+                ;;
+            month|months)
+                days=$((num * 30))
+                ;;
+            year|years)
+                days=$((num * 365))
+                ;;
+            *)
+                print_error "check_snap_refresh_date: unknown time unit for snap package $package_name: $unit"
+                snap_error_found=1
+                return
+                ;;
+        esac
+    elif [[ $refresh_date =~ ([0-9]{4})-([0-9]{2})-([0-9]{2}) ]]; then # example: refresh-date: 2025-02-08
+        # Extract the date string
+        date_str="${BASH_REMATCH[0]}"
+        # Convert both dates to seconds since epoch
+        refresh_epoch=$(date -d "$date_str" +%s)
+        now_epoch=$(date +%s)
+        # Calculate days difference
+        days=$(( (now_epoch - refresh_epoch) / 86400 ))
+    else
+        print_error "check_snap_refresh_date: could not parse refresh date for snap package $package_name"
+        snap_error_found=1
+        return
+    fi
+
+    max_nb_days_for_refresh=30
+    if (( days > $max_nb_days_for_refresh )); then
+        print_warning "last refresh for snap package $package_name is old ($refresh_date)"
+    fi
+}
+if snap list | grep -q "firefox"; then
+    check_snap_refresh_date "firefox"
+fi
+if snap list | grep -q "chromium"; then
+    check_snap_refresh_date "chromium"
+fi
+
 if snap saved | grep -v "No snapshots found."; then
     print_warning "above snap snapshots are stored ('sudo snap forget <snapshot_id>' to be run to forget them)"
 fi
