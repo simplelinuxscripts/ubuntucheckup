@@ -37,17 +37,17 @@ if [ $? -ne 0 ]; then
 fi
 
 # Check if snap packages
-echo "Checking snap packages..."
-echo "snap refresh times:"
-snap refresh --time | sed "/yesterday/s/.*/${BOLD}&${NC}/" | sed "/today/s/.*/${BOLD}&${NC}/" | sed "/tomorrow/s/.*/${BOLD}&${NC}/" | sed 's/^/  /'
+echo -e "${BOLD}Checking snap packages...${NC}"
+echo "${BOLD}- snap refresh times:${NC} $(snap refresh --time | sed 's/^/  /' | tr '\n' ' ')"
 snap_packages_that_can_be_updated=$(sudo snap refresh --list 2>&1 | grep -v "All snaps up to date")
 # example:
 #   sudo snap refresh --list
 #   Name      Version         Rev   Size   Publisher   Notes
 #   chromium  133.0.6943.141  3051  185MB  canonical✓  -
 if [ -n "${snap_packages_that_can_be_updated}" ]; then
-    echo "${snap_packages_that_can_be_updated}"
-    print_warning "above snap packages could be updated manually instead of automatically by default ('sudo snap refresh' to be run after having closed the applications, then 'snap refresh --list' for check / logs can also be checked with 'journalctl -u snapd' if needed)"
+    print_warning "snap package updates are ready:"
+    echo "${BOLD}- below snap packages could be updated manually instead of automatically${NC} ('sudo snap refresh' to be run after having closed the applications, then 'snap refresh --list' or 'journalctl -u snapd' for check)"
+    echo "${snap_packages_that_can_be_updated}" | awk -v yellow="$YELLOW" -v reset="$NC" 'NR==1 {print; next} {print yellow $1 reset, substr($0, length($1)+2)}'
 else
     print_success "snap packages are up-to-date"
 fi
@@ -55,11 +55,11 @@ read -p "Press Enter to continue..."
 echo
 
 # Check logs of last unattended-upgrades automatic runs
-echo "Checking unattended-upgrades..."
-echo "timers:"
+echo -e "${BOLD}Checking unattended-upgrades...${NC}"
+echo -e "${BOLD}- update/upgrade timers:${NC}"
 systemctl list-timers apt-daily.timer apt-daily-upgrade.timer | head -n 3
-echo "updates allowed to be applied automatically by unattended-upgrades: (Note: \"apt\" will detect wider set of updates)"
-less /var/log/unattended-upgrades/unattended-upgrades.log | grep -v "whitelist" | grep -v "blacklist" | tail -44 | sed "/ERROR/s/.*/${BOLD}&${NC}/" | sed "/INFO No packages found/s/.*/${BOLD}&${NC}/" | sed "/INFO All upgrades installed/s/.*/${BOLD}&${NC}/" | sed 's/^/  /'
+echo -e "${BOLD}- updates applied automatically by unattended-upgrades: (Note: \"apt\" will detect a wider set of updates)${NC}"
+less /var/log/unattended-upgrades/unattended-upgrades.log | grep -v "whitelist" | grep -v "blacklist" | tail -44 | sed "/ERROR/s/.*/${BOLD}&${NC}/" | sed "/INFO No packages found/s/.*/${BOLD}&${NC}/" | sed "/INFO All upgrades installed/s/.*/${BOLD}&${NC}/"
 read -p "Press Enter to continue..."
 echo
 
