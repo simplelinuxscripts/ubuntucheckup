@@ -1141,7 +1141,7 @@ check_snap_refresh_date() {
         return
     fi
 
-    max_nb_days_for_refresh=30
+    max_nb_days_for_refresh=45
     if (( days > $max_nb_days_for_refresh )); then
         print_warning "last refresh for snap package $package_name is old ($refresh_date)"
     fi
