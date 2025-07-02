@@ -48,21 +48,21 @@ TEST_SUDO_PWD=1
 #       └─ubuntu--vg-ubuntu--lv 252:1    0 473.9G  0 lvm    /
 #   => disk device for root folder is nvme0n1
 #   => HARD_DISK_DEVICE shall be set to "/dev/nvme0n1"
-HARD_DISK_DEVICE="/dev/nvme0n1"
+HARD_DISK_DEVICE="/dev/xxx"
 
 # Firefox snap settings folder
 SNAP_FOLDER="${HOME}/snap"
 SNAP_FIREFOX_FOLDER="${SNAP_FOLDER}/firefox/common/.mozilla/firefox"
-SNAP_FIREFOX_PROFILE_FOLDER="${SNAP_FIREFOX_FOLDER}/mnu864hu.default"
+SNAP_FIREFOX_PROFILE_FOLDER="${SNAP_FIREFOX_FOLDER}/xxxxxxxx.default"
 
 # Chromimum snap settings folder
 SNAP_CHROMIUM_FOLDER="${SNAP_FOLDER}/chromium/common/chromium/Default"
 
 # Expected PATH environment variable value (any change of PATH environment variable will be detected)
-EXPECTED_PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games:/usr/local/games:/snap/bin:${HOME}/DOCUMENTS/Informatique/Programmes/Linux:${HOME}/DOCUMENTS/Informatique/Programmes/Linux/simplelinuxscripts/findlines:${HOME}/DOCUMENTS/Informatique/Programmes/Linux/simplelinuxscripts/ubuntucheckup"
+EXPECTED_PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games:/usr/local/games:/snap/bin"
 
 # Expected program(s) in /usr/local/bin if any, "" if none
-EXPECTED_USR_LOCAL_BIN_PROGRAMS="obs"
+EXPECTED_USR_LOCAL_BIN_PROGRAMS=""
 
 # Optional: folder used to save a copy of some important configuration files
 #           and therefore be able to regularly check that they were not modified
@@ -141,7 +141,7 @@ fi
 if [ -d "${CHECKUP_FOLDER}/etc/sudoers.d" ]; then
     error_found=0
     # Notes:
-    # - ${CHECKUP_FOLDER}/etc/sudoers shall be created with current user's ownership (not root as source file) so that the script can access it, for example with:
+    # - ${CHECKUP_FOLDER}/etc/sudoers shall be created with current user's ownership (not root like source file) so that the script can access it, for example with:
     #     sudo cp /etc/sudoers ${CHECKUP_FOLDER}/etc/sudoers
     #     followed by sudo chown yourusername:yourgroupname ${CHECKUP_FOLDER}/etc/sudoers
     #   The same applies to other files/folders checked in ${CHECKUP_FOLDER} by this script.
