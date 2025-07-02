@@ -1252,4 +1252,4 @@ echo
 echo "---------- Updates ----------"
 echo
 
-${SCRIPT_FOLDER}/update.sh
+${SCRIPT_FOLDER}/check_updates.sh
