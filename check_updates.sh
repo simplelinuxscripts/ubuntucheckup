@@ -42,9 +42,9 @@ if [ $? -ne 0 ]; then
 fi
 
 # Check if snap packages
-echo -e "${BOLD}Checking snap packages...${NC}"
+echo -e "Checking snap packages..."
 if [ "$VERBOSE" -eq 1 ]; then
-    echo "${BOLD}- snap refresh times:${NC} $(snap refresh --time | sed 's/^/  /' | tr '\n' ' ')"
+    echo "- snap refresh times: $(snap refresh --time | sed 's/^/  /' | tr '\n' ' ')"
 fi
 snap_packages_that_can_be_updated=$(sudo snap refresh --list 2>&1 | grep -v "All snaps up to date")
 # example:
@@ -63,10 +63,10 @@ echo
 
 if [ "$VERBOSE" -eq 1 ]; then
     # Check logs of last unattended-upgrades automatic runs
-    echo -e "${BOLD}Checking unattended-upgrades...${NC}"
-    echo -e "${BOLD}- update/upgrade timers:${NC}"
+    echo -e "Checking unattended-upgrades..."
+    echo -e "- update/upgrade timers:"
     systemctl list-timers apt-daily.timer apt-daily-upgrade.timer | head -n 3
-    echo -e "${BOLD}- updates applied automatically by unattended-upgrades: (Note: \"apt\" will detect a wider set of updates)${NC}"
+    echo -e "- updates applied automatically by unattended-upgrades: (Note: \"apt\" will detect a wider set of updates)"
     less /var/log/unattended-upgrades/unattended-upgrades.log | grep -v "whitelist" | grep -v "blacklist" | tail -44 | sed "/ERROR/s/.*/${BOLD}&${NC}/" | sed "/INFO No packages found/s/.*/${BOLD}&${NC}/" | sed "/INFO All upgrades installed/s/.*/${BOLD}&${NC}/"
     read -p "Press Enter to continue..."
     echo
@@ -83,7 +83,7 @@ if [ $? -ne 0 ]; then
 fi
 
 echo
-read -p "Press Enter to check available upgrades..."
+read -p "Press Enter to check packages to upgrade..."
 echo
 
 echo "Packages to upgrade:"
@@ -93,12 +93,10 @@ apt list --upgradable
 nb_security_updates=$(apt list --upgradable 2>&1 | grep -i "security" | wc -l)
 if [ "$nb_security_updates" -ne 0 ]; then
     echo -e "${BOLD}among which security update(s)${NC}"
-else
-    echo "among which no security updates"
 fi
 
 echo
-read -p "Press Enter to start upgrades..."
+read -p "Press Enter to apply upgrades..."
 echo
 
 echo "Running apt upgrade..."
@@ -109,9 +107,11 @@ if [ $? -ne 0 ]; then
     exit 1
 fi
 
+echo
 sudo apt-get check
 if [ $? -eq 0 ]; then
     print_success "apt-get check"
 else
     print_error "apt-get check"
 fi
+echo

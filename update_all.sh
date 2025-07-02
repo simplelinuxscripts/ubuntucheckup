@@ -17,7 +17,7 @@ NC=$'\E[0m'
 print_success() {
     success_str="$1"
     echo
-    echo -e "${GREEN}OK!${NC} ${success_str}"
+    echo -e "${GREEN}OK! ${success_str}${NC}"
     echo
 }
 
@@ -35,11 +35,21 @@ print_error() {
     echo
 }
 
-echo
-echo -e "${BOLD}********************${NC}"
-echo -e "${BOLD}UPDATE ALL PACKAGES...${NC}"
-echo -e "${BOLD}********************${NC}"
+SNAPS_ONLY=0
+if [ "$1" = "-snaps" ]; then
+    SNAPS_ONLY=1
+fi
 
+echo
+if [ "$SNAPS_ONLY" -eq 0 ]; then
+    echo -e "${BOLD}**********************${NC}"
+    echo -e "${BOLD}UPDATE ALL PACKAGES...${NC}"
+    echo -e "${BOLD}**********************${NC}"
+else
+    echo -e "${BOLD}***********************${NC}"
+    echo -e "${BOLD}UPDATE SNAP PACKAGES...${NC}"
+    echo -e "${BOLD}***********************${NC}"
+fi
 echo
 read -p "Close all apps and press Enter to continue..."
 
@@ -79,6 +89,12 @@ if [ -n "${snap_packages_that_can_be_updated}" ]; then
     exit 1
 fi
 
+if [ "$SNAPS_ONLY" -eq 1 ]; then
+    print_success "SUCCESS (snaps)"
+    read -p "Press Enter to exit..."
+    exit 1
+fi
+
 echo
 echo -e "${BOLD}***** sudo apt update... *****${NC}"
 echo
@@ -104,7 +120,7 @@ echo -e "${BOLD}***** final status: *****${NC}"
 echo
 sudo apt-get check
 if [ $? -eq 0 ]; then
-    print_success "SUCCESS"
+    print_success "SUCCESS (all packages)"
 else
     print_error "sudo apt-get check"
 fi
