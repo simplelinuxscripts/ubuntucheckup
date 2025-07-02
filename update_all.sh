@@ -89,7 +89,6 @@ if [ $? -ne 0 ]; then
     exit 1
 fi
 
-sleep 3
 echo
 echo -e "${BOLD}***** sudo apt -y upgrade... *****${NC}"
 echo
