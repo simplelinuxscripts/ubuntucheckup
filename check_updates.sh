@@ -30,7 +30,7 @@ print_error() {
 }
 
 VERBOSE=0
-if [ "$1" = "--verbose" ]; then
+if [ "$1" = "-verbose" ]; then
     VERBOSE=1
 fi
 
