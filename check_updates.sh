@@ -89,6 +89,14 @@ echo
 echo "Packages to upgrade:"
 apt list --upgradable
 
+# See https://www.baeldung.com/linux/find-security-updates-list: sudo unattended-upgrade --dry-run 2>&1 would be more accurate but can be much slower => apt is preferred
+nb_security_updates=$(apt list --upgradable 2>&1 | grep -i "security" | wc -l)
+if [ "$nb_security_updates" -ne 0 ]; then
+    echo -e "${BOLD}among which security update(s)${NC}"
+else
+    echo "among which no security updates"
+fi
+
 echo
 read -p "Press Enter to start upgrades..."
 echo
