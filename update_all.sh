@@ -77,9 +77,9 @@ if [ $? -ne 0 ]; then
     exit 1
 fi
 
-snap_packages_that_can_be_updated=$(sudo snap refresh --list 2>&1 | grep -v "All snaps up to date")
+snap_packages_that_can_be_updated=$(snap refresh --list 2>&1 | grep -v "All snaps up to date")
 # example:
-#   sudo snap refresh --list
+#   snap refresh --list
 #   Name      Version         Rev   Size   Publisher   Notes
 #   chromium  133.0.6943.141  3051  185MB  canonical✓  -
 if [ -n "${snap_packages_that_can_be_updated}" ]; then

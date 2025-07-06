@@ -46,14 +46,14 @@ echo -e "Checking snap packages..."
 if [ "$VERBOSE" -eq 1 ]; then
     echo "- snap refresh times: $(snap refresh --time | sed 's/^/  /' | tr '\n' ' ')"
 fi
-snap_packages_that_can_be_updated=$(sudo snap refresh --list 2>&1 | grep -v "All snaps up to date")
+snap_packages_that_can_be_updated=$(snap refresh --list 2>&1 | grep -v "All snaps up to date")
 # example:
-#   sudo snap refresh --list
+#   snap refresh --list
 #   Name      Version         Rev   Size   Publisher   Notes
 #   chromium  133.0.6943.141  3051  185MB  canonical✓  -
 if [ -n "${snap_packages_that_can_be_updated}" ]; then
     print_warning "snap package updates are ready:"
-    echo "${BOLD}- below snap packages could be updated manually instead of automatically${NC} ('sudo snap refresh' to be run after having closed the applications, then 'snap refresh --list' or 'journalctl -u snapd' for check)"
+    echo "${BOLD}- below snap packages could be updated manually instead of automatically${NC} ('sudo snap refresh' to be run after having closed the applications, then 'snap refresh --list' for check)"
     echo "${snap_packages_that_can_be_updated}" | awk -v yellow="$YELLOW" -v reset="$NC" 'NR==1 {print; next} {print yellow $1 reset, substr($0, length($1)+2)}'
 else
     print_success "snap packages are up-to-date"
