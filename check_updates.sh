@@ -114,4 +114,4 @@ if [ $? -eq 0 ]; then
 else
     print_error "apt-get check"
 fi
-echo
+read -p "Press Enter to exit..."
