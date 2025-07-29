@@ -1308,7 +1308,7 @@ else
     if [ ${nb_warnings} -eq 0 ]; then
         echo -e "*** DONE ${RED}with ${nb_errors} errors(s)${NC} ***"
     else
-        echo -e "*** DONE ${RED}with ${nb_errors} errors(s)${NC} + ${YELLOW}with ${nb_warnings} warning(s)${NC} ***"
+        echo -e "*** DONE ${RED}with ${nb_errors} errors(s)${NC} + ${YELLOW}${nb_warnings} warning(s)${NC} ***"
     fi
 fi
 
