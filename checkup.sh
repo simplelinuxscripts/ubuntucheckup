@@ -94,9 +94,10 @@ print_info() {
 nb_warnings=0
 print_warning() {
     warning_str="$1"
+    stop_on_warning="$2"
     nb_warnings=$((nb_warnings+1))
     echo -e "${YELLOW}Warning:${NC} ${warning_str}"
-    if [ ${STOP_ON_WARNINGS} -eq 1 ]; then
+    if [ "${STOP_ON_WARNINGS}" == "1" ] || [ "${stop_on_warning}" == "1" ]; then
         read -p "Press Enter to ignore..."
     fi
 }
@@ -104,9 +105,10 @@ print_warning() {
 nb_errors=0
 print_error() {
     error_str="$1"
+    stop_on_error="$2"
     nb_errors=$((nb_errors+1))
     echo -e "${RED}ERROR:${NC} ${error_str}"
-    if [ ${STOP_ON_ERRORS} -eq 1 ]; then
+    if [ "${STOP_ON_ERRORS}" == "1" ] || [ "${stop_on_error}" == "1" ]; then
         read -p "Press Enter to ignore..."
     fi
 }
@@ -206,7 +208,7 @@ ping -c 1 -W 5 "www.google.com" > /dev/null 2>&1
 if [ $? -eq 0 ]; then
     print_success "network connection"
 else
-    print_error "no network connection detected"
+    print_error "no network connection detected (next commands may fail)" 1
 fi
 
 # Check wireless connections (wifi, bluetooth)
@@ -262,7 +264,7 @@ echo
 
 # Check disk usage
 usage=$(df / | awk 'NR==2 {print $5}' | sed 's/%//')
-if [ "$usage" -ge 55 ]; then
+if [ "$usage" -ge 60 ]; then
     print_warning "disk usage is high: $usage%"
 else
     print_success "disk usage ($usage%)"
@@ -309,6 +311,11 @@ echo
 print_info "most frequent critical errors:"
 journalctl -p 0..2 --since "7 days ago" > /tmp/journalctl_errors.log
 grep -oP '(?<=: ).*' /tmp/journalctl_errors.log | sed 's/for [0-9]*s/for XXs/g' | grep -v "password is required" | sort | uniq -c | sort -nr  | head -25 | awk '{$1=$1; print}' | sed 's/^/- /'
+
+# Detect basic suspicious processes
+SUSPICIOUS_KEYWORDS='rootkit|snif|backd|stealth|keyl|logk|troj|virus|hack|malware|spy|\btap|tap\b|hide|hidden|cloak|transparent|lkl|uberkey|vlog|letterpress|sinister|tanit|keystroke|spy'
+ps aux | grep -v "grep " | grep -Ei "$SUSPICIOUS_KEYWORDS|track|input|capture|scan|record|hook" && print_error "suspicious process(es) found"
+# Note: if you install external tools like chkrootkit package, complex rootkit detections can be done
 
 # Detect processes that are still executing after their executable files have been removed (suspicious processes)
 find /proc/*/exe -lname '*(deleted)' 2>/dev/null | while read -r exe; do
@@ -513,15 +520,40 @@ if [ -f "${CHECKUP_FOLDER}/systemctl_services_enabled_sauv.txt" ]; then
 else
     print_warning "startup services check is skipped because reference file ${CHECKUP_FOLDER}/systemctl_services_enabled_sauv.txt does not exist"
 fi
+# Check SysVinit (Ubuntu used SysVinit in older versions, but now uses systemd as the default init system. However, /etc/init.d/ still exists for backward compatibility and for services that haven’t migrated to systemd)
+if [ -d "/etc/init.d" ]; then
+    non_root_sysvinit_scripts=$(find "/etc/init.d" -type f ! -user root) # scripts not owned by root can pose a security risk
+    if [ -n "${non_root_sysvinit_scripts}" ]; then
+        print_error "unexpected non root SysVinit script(s):\n$non_root_sysvinit_scripts"
+    fi
+fi
 
-# Check startup shells
-if [ -f "${CHECKUP_FOLDER}/.profile" ] && [ -f "${CHECKUP_FOLDER}/.bashrc" ]; then
+# Check startup scripts
+# When bash starts as a login shell (like when you log in via the console or an SSH session), it checks in order:
+# - ~/.bash_profile
+# - If that doesn’t exist, then ~/.bash_login
+# - If that doesn’t exist either, then ~/.profile
+# In Ubuntu, graphical terminals like GNOME terminal typically launch non-login interactive shells. In those cases:
+# - Bash skips .bash_profile, .bash_login, and .profile.
+# - Instead, it directly sources ~/.bashrc
+if [ -f "${CHECKUP_FOLDER}/.profile" ] && [ -f "${CHECKUP_FOLDER}/.bashrc" ]; then # (grouped check because both files are present by default in Ubuntu)
     error_found=0
+
+    if [ -f "${HOME}/.bash_profile" ]; then # (adapt this check if this file is legitimate)
+        print_error "unexpected ${HOME}/.bash_profile file"
+        error_found=1
+    fi
+    if [ -f "${HOME}/.bash_login" ]; then # (adapt this check if this file is legitimate - file rarely used today)
+        print_error "unexpected ${HOME}/.bash_login file"
+        error_found=1
+    fi
+
     diff "${CHECKUP_FOLDER}/.profile" "${HOME}/.profile"
     if [ $? -ne 0 ]; then
         print_error ".profile file has changed (check changes and copy file ${HOME}/.profile to ${CHECKUP_FOLDER}/.profile)"
         error_found=1
     fi
+
     diff "${CHECKUP_FOLDER}/.bashrc" "${HOME}/.bashrc"
     if [ $? -ne 0 ]; then
         print_error ".bashrc file has changed (check changes and copy file ${HOME}/.bashrc to ${CHECKUP_FOLDER}/.bashrc)"
@@ -529,10 +561,10 @@ if [ -f "${CHECKUP_FOLDER}/.profile" ] && [ -f "${CHECKUP_FOLDER}/.bashrc" ]; th
     fi
 
     if [ ${error_found} -eq 0 ]; then
-        print_success "startup shells"
+        print_success "startup scripts"
     fi
 else
-    print_warning "startup shells check is skipped because reference files ${CHECKUP_FOLDER}/.profile and ${CHECKUP_FOLDER}/.bashrc do not exist"
+    print_warning "startup scripts check is skipped because reference files ${CHECKUP_FOLDER}/.profile and ${CHECKUP_FOLDER}/.bashrc do not exist"
 fi
 
 # Jobs scheduled with cron (adapt this check if legitimate jobs are scheduled)
@@ -980,11 +1012,9 @@ for elt in "${known_suspicious_files[@]}"; do
 done
 
 # 3) basic suspicious keywords in module names
-suspicious_keywords='rootkit|snif|backd|stealth|keyl|logk|troj|virus|hack|malware|spy|\btap|tap\b|inject|hide|hidden|cloak|transparent'
-lsmod | grep -Ei "$suspicious_keywords" && print_error "suspicious module(s) found"
-dpkg -l | grep -v "fonts-hack" | grep -Ei "$suspicious_keywords" && print_error "suspicious package(s) found"
-
-# 4) if you install optional chkrootkit package, complex rootkit detections can be done
+lsmod | grep -Ei "$SUSPICIOUS_KEYWORDS|inject" && print_error "suspicious module(s) found"
+dpkg -l | grep -v "fonts-hack" | grep -Ei "$SUSPICIOUS_KEYWORDS|inject" && print_error "suspicious package(s) found"
+# Note: if you install external tools like chkrootkit package, complex rootkit detections can be done
 
 # In Ubuntu, snap is used by default instead of flatpak
 if echo "${apt_list_installed}" | grep -q "flatpak"; then
@@ -1052,6 +1082,10 @@ if [ -f "${CHECKUP_FOLDER}/snap_list_sauv.txt" ]; then
 else
     print_warning "snap package list check is skipped because reference file "${CHECKUP_FOLDER}/snap_list_sauv.txt" does not exist"
 fi
+if ! systemctl is-active --quiet snapd; then
+    print_error "snapd service is not running"
+    snap_error_found=1
+fi
 if snap debug confinement | grep -v "strict"; then
     print_error "above default confinement mode for snap packages is not strict"
     snap_error_found=1
@@ -1066,6 +1100,11 @@ if snap list --all | grep -v "/stable" | grep -v "     Publisher     "; then
 fi
 if snap list --all | grep -E " held|held$"; then
     print_error "above snap packages have updates disabled ('sudo snap refresh --unhold' to be run to enable updates)"
+    snap_error_found=1
+fi
+snap_refresh_time=$(snap refresh --time | grep "timer: 00:00~24:00/4$") # every 4 hour each day is the default Ubuntu snap refresh schedule
+if [ -z "${snap_refresh_time}" ]; then
+    print_warning "unexpected snap refresh schedule:\n$(snap refresh --time)"
     snap_error_found=1
 fi
 snap_refresh_retain=$(sudo snap get system refresh.retain)
