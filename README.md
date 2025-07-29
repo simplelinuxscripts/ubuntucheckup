@@ -6,12 +6,11 @@
 
 ### DESCRIPTION:
 
-It detects potential issues and displays warning/error messages, similar to an antivirus scan. Customize it to fit your specific installation. Running it regularly helps ensure that no critical components have changed or been corrupted. 
+A Linux bash script to verify the safety and health of an Ubuntu installation. It detects potential issues and displays warning/error messages, similar to an antivirus scan. Running it regularly helps ensure that no critical components have changed or been corrupted. Customize it to fit your specific installation.
 
 ### EXAMPLES:
 
 \- example with no issues detected:  
-![example_1](https://github.com/user-attachments/assets/d8c9a922-1e3e-4a12-bf26-5d36ad6c36d0)  
+<img width="700" height="1315" alt="example_1" src="https://github.com/user-attachments/assets/699280e9-96a3-486e-ad26-f4e314b523d5" />  
 \- example with issues detected:  
-![example_2](https://github.com/user-attachments/assets/e3c4c71e-f143-4ac9-80ac-c7ea8b957f16)  
-
+<img width="700" height="1297" alt="example_2" src="https://github.com/user-attachments/assets/72330313-0a88-4790-b8c7-81c4e1eb9e73" />  
