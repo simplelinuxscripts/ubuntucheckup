@@ -1,4 +1,4 @@
-#### A Linux bash script to verify the safety and health of an Ubuntu installation
+#### A bash script to verify the safety and health of an Ubuntu installation
 
 ### USAGE:
 
@@ -6,7 +6,7 @@
 
 ### DESCRIPTION:
 
-A Linux bash script to verify the safety and health of an Ubuntu installation. It detects potential issues and displays warning/error messages, similar to an antivirus scan. Running it regularly helps ensure that no critical components have changed or been corrupted. Customize it to fit your specific installation.
+A bash script to verify the safety and health of an Ubuntu installation. It detects potential issues and displays warning/error messages, similar to an antivirus scan. Running it regularly helps ensure that no critical components have changed or been corrupted. Customize it to fit your specific Linux installation.
 
 ### EXAMPLES:
 
