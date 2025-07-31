@@ -2,10 +2,10 @@
 
 ############################
 #
-# A Linux bash script to verify the safety and health of an Ubuntu installation.
+# Bash script to verify the safety and health of an Ubuntu installation.
 # It detects potential issues and displays warning/error messages, similar to an antivirus scan.
-# Customize it to fit your specific installation.
 # Running it regularly helps ensure that no critical components have changed or been corrupted.
+# Customize it to fit your specific Linux installation.
 # (https://github.com/simplelinuxscripts/ubuntucheckup)
 #
 ############################
@@ -1298,17 +1298,26 @@ fi
 print_success "installed packages (see above logs for any warnings/errors)"
 
 echo
+
+warning_str="warning"
+if [ ${nb_warnings} -ge 2 ]; then
+    warning_str="warnings"
+fi
+error_str="error"
+if [ ${nb_errors} -ge 2 ]; then
+    error_str="errors"
+fi
 if [ ${nb_errors} -eq 0 ]; then
     if [ ${nb_warnings} -eq 0 ]; then
         echo -e "*** DONE ${GREEN}(success)${NC} ***"
     else
-        echo -e "*** DONE ${YELLOW}with ${nb_warnings} warning(s)${NC} ***"
+        echo -e "*** DONE ${YELLOW}with ${nb_warnings} ${warning_str}${NC} ***"
     fi
 else
     if [ ${nb_warnings} -eq 0 ]; then
-        echo -e "*** DONE ${RED}with ${nb_errors} error(s)${NC} ***"
+        echo -e "*** DONE ${RED}with ${nb_errors} ${error_str}${NC} ***"
     else
-        echo -e "*** DONE ${RED}with ${nb_errors} error(s)${NC} + ${YELLOW}${nb_warnings} warning(s)${NC} ***"
+        echo -e "*** DONE ${RED}with ${nb_errors} ${error_str}${NC} + ${YELLOW}${nb_warnings} ${warning_str}${NC} ***"
     fi
 fi
 
