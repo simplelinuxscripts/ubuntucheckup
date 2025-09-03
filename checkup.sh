@@ -48,21 +48,21 @@ TEST_SUDO_PWD=1
 #       └─ubuntu--vg-ubuntu--lv 252:1    0 473.9G  0 lvm    /
 #   => disk device for root folder is nvme0n1
 #   => HARD_DISK_DEVICE shall be set to "/dev/nvme0n1"
-HARD_DISK_DEVICE="/dev/xxx"
+HARD_DISK_DEVICE="/dev/nvme0n1"
 
 # Firefox snap settings folder
 SNAP_FOLDER="${HOME}/snap"
 SNAP_FIREFOX_FOLDER="${SNAP_FOLDER}/firefox/common/.mozilla/firefox"
-SNAP_FIREFOX_PROFILE_FOLDER="${SNAP_FIREFOX_FOLDER}/xxxxxxxx.default"
+SNAP_FIREFOX_PROFILE_FOLDER="${SNAP_FIREFOX_FOLDER}/mnu864hu.default"
 
 # Chromimum snap settings folder
 SNAP_CHROMIUM_FOLDER="${SNAP_FOLDER}/chromium/common/chromium/Default"
 
 # Expected PATH environment variable value (any change of PATH environment variable will be detected)
-EXPECTED_PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games:/usr/local/games:/snap/bin"
+EXPECTED_PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games:/usr/local/games:/snap/bin:${HOME}/DOCUMENTS/Informatique/Programmes/Linux:${HOME}/DOCUMENTS/Informatique/Programmes/Linux/simplelinuxscripts/findlines:${HOME}/DOCUMENTS/Informatique/Programmes/Linux/simplelinuxscripts/ubuntucheckup"
 
 # Expected program(s) in /usr/local/bin if any, "" if none
-EXPECTED_USR_LOCAL_BIN_PROGRAMS=""
+EXPECTED_USR_LOCAL_BIN_PROGRAMS="obs"
 
 # Optional: folder used to save a copy of some important configuration files
 #           and therefore be able to regularly check that they were not modified
@@ -268,6 +268,14 @@ if [ "$usage" -ge 60 ]; then
     print_warning "disk usage is high: $usage%"
 else
     print_success "disk usage ($usage%)"
+fi
+
+# Size of specific folders
+if [ -d "${HOME}/.cache" ]; then # Note: this is one cache folder among others
+    cache_size=$(du -sb "${HOME}/.cache" | cut -f1)
+    if [ "$cache_size" -gt "$((2 * 1024 * 1024 * 1024))" ]; then # 2Gb
+        print_warning "cache contents in folder ${HOME}/.cache take a lot of space: $((cache_size / 1024 / 1024)) MB (close all apps, run 'rm -rf ${HOME}/.cache/*' and restart Linux)"
+    fi
 fi
 
 disk_size=$(lsblk -d -o SIZE "${HARD_DISK_DEVICE}" | tail -1)
