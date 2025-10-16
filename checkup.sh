@@ -48,21 +48,21 @@ TEST_SUDO_PWD=1
 #       └─ubuntu--vg-ubuntu--lv 252:1    0 473.9G  0 lvm    /
 #   => disk device for root folder is nvme0n1
 #   => HARD_DISK_DEVICE shall be set to "/dev/nvme0n1"
-HARD_DISK_DEVICE="/dev/xxx"
+HARD_DISK_DEVICE="/dev/nvme0n1"
 
 # Firefox snap settings folder
 SNAP_FOLDER="${HOME}/snap"
 SNAP_FIREFOX_FOLDER="${SNAP_FOLDER}/firefox/common/.mozilla/firefox"
-SNAP_FIREFOX_PROFILE_FOLDER="${SNAP_FIREFOX_FOLDER}/xxxxxxxx.default"
+SNAP_FIREFOX_PROFILE_FOLDER="${SNAP_FIREFOX_FOLDER}/y9gb41wu.default"
 
 # Chromimum snap settings folder
 SNAP_CHROMIUM_FOLDER="${SNAP_FOLDER}/chromium/common/chromium/Default"
 
 # Expected PATH environment variable value (any change of PATH environment variable will be detected)
-EXPECTED_PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games:/usr/local/games:/snap/bin"
+EXPECTED_PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games:/usr/local/games:/snap/bin:${HOME}/DOCUMENTS/Informatique/Programmes/Linux:${HOME}/DOCUMENTS/Informatique/Programmes/Linux/simplelinuxscripts/findlines:${HOME}/DOCUMENTS/Informatique/Programmes/Linux/simplelinuxscripts/ubuntucheckup"
 
 # Expected program(s) in /usr/local/bin if any, "" if none
-EXPECTED_USR_LOCAL_BIN_PROGRAMS=""
+EXPECTED_USR_LOCAL_BIN_PROGRAMS="obs"
 
 # Optional: folder used to save a copy of some important configuration files
 #           and therefore be able to regularly check that they were not modified
@@ -737,6 +737,13 @@ if [ -d "${SNAP_FIREFOX_PROFILE_FOLDER}" ]; then
         print_success "firefox settings"
     fi
 
+    unexpected_firefox_extension_urls=$(grep -o '[^"/]*@[^"!]*' "${SNAP_FIREFOX_PROFILE_FOLDER}/extensions.json" | grep -v '@mozilla.org$' | grep -v '@mozilla.com$' | grep -v '@mozilla.com.xpi$')
+    if [ -n "${unexpected_firefox_extension_urls}" ]; then
+        echo "${unexpected_firefox_extension_urls}"
+        print_error "above firefox extensions URLs are unexpected"
+        error_found=1
+    fi
+
     if [ -d "${CHECKUP_FOLDER}/firefox" ]; then
         # Firefox profile
         diff "${CHECKUP_FOLDER}/firefox/profiles_sauv.ini" "${SNAP_FIREFOX_FOLDER}/profiles.ini"
@@ -753,7 +760,7 @@ if [ -d "${SNAP_FIREFOX_PROFILE_FOLDER}" ]; then
         sed 's/[0-9]\+/X/g' "${SNAP_FIREFOX_PROFILE_FOLDER}/addons.json" | sed 's/},/},\n/g' > "${CHECKUP_FOLDER}/firefox/addons_current_reformated.json"
         diff "${CHECKUP_FOLDER}/firefox/addons_names_sauv_reformated_sorted.json" "${CHECKUP_FOLDER}/firefox/addons_names_current_reformated_sorted.json"
         if [ $? -ne 0 ]; then
-            print_error "above firefox addons names have changed (check changes and copy file ${SNAP_FIREFOX_PROFILE_FOLDER}/addons.json to ${CHECKUP_FOLDER}/firefox/addons_sauv.json)"
+            print_error "above firefox addons have changed (check changes and copy file ${SNAP_FIREFOX_PROFILE_FOLDER}/addons.json to ${CHECKUP_FOLDER}/firefox/addons_sauv.json)"
             error_found=1
         fi
         # Below check is too strict so is commented:
@@ -769,7 +776,7 @@ if [ -d "${SNAP_FIREFOX_PROFILE_FOLDER}" ]; then
         sed 's/[0-9]\+/X/g' "${SNAP_FIREFOX_PROFILE_FOLDER}/extensions.json" | sed 's/},/},\n/g' > "${CHECKUP_FOLDER}/firefox/extensions_current_reformated.json"
         diff "${CHECKUP_FOLDER}/firefox/extensions_names_sauv_reformated_sorted.json" "${CHECKUP_FOLDER}/firefox/extensions_names_current_reformated_sorted.json"
         if [ $? -ne 0 ]; then
-            print_error "above firefox extensions names have changed (check changes and copy file ${SNAP_FIREFOX_PROFILE_FOLDER}/extensions.json to ${CHECKUP_FOLDER}/firefox/extensions_sauv.json)"
+            print_error "above firefox extensions have changed (check changes and copy file ${SNAP_FIREFOX_PROFILE_FOLDER}/extensions.json to ${CHECKUP_FOLDER}/firefox/extensions_sauv.json)"
             error_found=1
         fi
         # Below check is too strict so is commented:
