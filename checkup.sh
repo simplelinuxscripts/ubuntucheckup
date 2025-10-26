@@ -737,10 +737,17 @@ if [ -d "${SNAP_FIREFOX_PROFILE_FOLDER}" ]; then
         print_success "firefox settings"
     fi
 
-    unexpected_firefox_extension_urls=$(grep -o '[^"/]*@[^"!]*' "${SNAP_FIREFOX_PROFILE_FOLDER}/extensions.json" | grep -v '@mozilla.org$' | grep -v '@mozilla.com$' | grep -v '@mozilla.com.xpi$')
+    unexpected_firefox_extension_urls=$(grep -o '[^"/]*@[^"!]*' "${SNAP_FIREFOX_PROFILE_FOLDER}/extensions.json" | grep -v 'mozilla.org$' | grep -v 'mozilla.org.xpi$' | grep -v 'mozilla.com$' | grep -v 'mozilla.com.xpi$')
     if [ -n "${unexpected_firefox_extension_urls}" ]; then
         echo "${unexpected_firefox_extension_urls}"
         print_error "above firefox extensions URLs are unexpected"
+        error_found=1
+    fi
+
+    unexpected_firefox_addon_urls=$(grep -o '[^"/]*@[^"!]*' "${SNAP_FIREFOX_PROFILE_FOLDER}/addons.json" | grep -v 'mozilla.org$' | grep -v 'mozilla.com$')
+    if [ -n "${unexpected_firefox_addon_urls}" ]; then
+        echo "${unexpected_firefox_addon_urls}"
+        print_error "above firefox addons URLs are unexpected"
         error_found=1
     fi
 
