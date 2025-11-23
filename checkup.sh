@@ -181,14 +181,6 @@ else
     print_success "wayland session"
 fi
 
-# Check that at least one ubuntu xsession is available (useful as a backup session in case of issues with desktops other than gnome)
-ubuntu_xsessions=$(ls /usr/share/xsessions/ | grep -E "ubuntu.*\.desktop") # example of ls /usr/share/xsessions/ output: plasmax11.desktop  ubuntu-xorg.desktop  ubuntu.desktop
-if [ -z "${ubuntu_xsessions}" ]; then
-    print_warning "no ubuntu xsession is available"
-else
-    print_success "xsessions"
-fi
-
 # Check if sessions were opened by other users
 # (gdm stands for GNOME Display Manager)
 sessions_opened_by_other_users=$(journalctl -u systemd-logind --no-pager | grep -i "New session" | grep -v "$(whoami)." | grep -v "user gdm." | grep -v "user sddm.")
@@ -857,7 +849,7 @@ echo "checking package files storage..."
 #   1) dpkg -S /usr/share/icons/LoginIcons => package name is displayed like "ubuntu-mono: /usr/share/icons/LoginIcons"
 #   2) sudo apt reinstall ubuntu-mono => this command reinstalls the faulty package
 # - When difference cannot be avoided by reinstalling source package or is normal due to customization, grep -v is piped to below command
-dpkg_verify_status=$(sudo dpkg --verify | grep -v "/etc/apt/apt.conf.d/10periodic" | grep -v "/etc/cloud/templates/sources.list.debian.deb822.tmpl" | grep -v "/etc/cloud/templates/sources.list.ubuntu.deb822.tmpl" | grep -v "/etc/xdg/libkleopatrarc" | grep -v "/etc/update-manager/release-upgrades" )
+dpkg_verify_status=$(sudo dpkg --verify | grep -v "/etc/apt/apt.conf.d/10periodic" | grep -v "/etc/cloud/templates/sources.list.debian.deb822.tmpl" | grep -v "/etc/cloud/templates/sources.list.ubuntu.deb822.tmpl" | grep -v "/etc/xdg/libkleopatrarc" | grep -v "/etc/update-manager/release-upgrades" | grep -v "/usr/lib/firmware/nvidia/")
 if [ -n "${dpkg_verify_status}" ]; then
     echo "${dpkg_verify_status}"
     print_error "errors in package files storage, possibly due to manual updates, file corruptions, file system errors on disk, see above (package reinstallation or package file restoration may be needed)"
@@ -1039,8 +1031,10 @@ dpkg -l | grep -v "fonts-hack" | grep -Ei "$SUSPICIOUS_KEYWORDS|inject" && print
 # Note: if you install external tools like chkrootkit package, complex rootkit detections can be done
 
 # In Ubuntu, snap is used by default instead of flatpak
-if echo "${apt_list_installed}" | grep -q "flatpak"; then
-    print_warning "flatpak is installed (snap is preferred to flatpak in Ubuntu)"
+flatpak_packages=$(echo "${apt_list_installed}" | grep "flatpak")
+if [ -n "$flatpak_packages" ]; then
+    echo "$flatpak_packages"
+    print_warning "above flatpak packages are installed (snap is preferred to flatpak in Ubuntu)"
 fi
 
 apt_cache_policy_all_packages=$(apt-cache policy $(dpkg-query -W -f='${binary:Package}\n'))
