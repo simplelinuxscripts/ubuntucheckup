@@ -841,6 +841,38 @@ else
     print_error "chromium extensions check is skipped because chromium snap folder ${SNAP_FOLDER}/chromium does not exist"
 fi
 
+# Check libreoffice
+error_found=0
+# If KDE Plasma is installed, LibreOffice KDE integration package (libreoffice-kfX) must match the KDE Frameworks major version (X) for proper integration
+kde_plasma_installed=$(dpkg-query -W -f='${Status}\n' plasma-desktop plasma-workspace 2>/dev/null | grep -c "install ok installed")
+if [ "$kde_plasma_installed" -ne 0 ]; then
+    libreoffice_kf_packages=$(dpkg-query -W -f='${Package}\n' 'libreoffice-kf*' 2>/dev/null)
+    if [ "$libreoffice_kf_packages" == "" ]; then
+        print_error "LibreOffice KDE integration package (libreoffice-kfX) is missing"
+        error_found=1
+    else
+        # - extract LibreOffice KDE integration package (libreoffice-kfX) major version
+        libreoffice_kf_version=$(echo "$libreoffice_kf_packages" | sed -E 's/.*libreoffice-kf([0-9]).*/\1/' | sort -r | head -n1)
+        # - extract KDE Frameworks major version (highest available)
+        kde_frameworks_version=$(dpkg-query -W -f='${Package}\n' 'libkf*coreaddons*' | sed -En 's/.*libkf([0-9])coreaddons.*/\1/p' | sort -r | head -n1)
+        # - compare versions
+        if [ "$libreoffice_kf_version" != "$kde_frameworks_version" ]; then
+            print_error "Wrong LibreOffice KDE integration: libreoffice-kf$libreoffice_kf_version does not match KDE Frameworks version $kde_frameworks_version"
+            error_found=1
+        fi
+    fi
+fi
+required_lo_pkgs="libreoffice-core libreoffice-common libreoffice-writer libreoffice-calc libreoffice-impress"
+for pkg in $required_lo_pkgs; do
+    if ! dpkg-query -W -f='${Status}' "$pkg" 2>/dev/null | grep -q "install ok installed"; then
+        print_error "LibreOffice component missing: $pkg"
+        error_found=1
+    fi
+done
+if [ ${error_found} -eq 0 ]; then
+    print_success "libreoffice install"
+fi
+
 # Check package files storage
 echo
 echo "checking package files storage..."
@@ -966,19 +998,19 @@ else
     fi
 fi
 
-apt_list_installed=$(apt list --installed 2> /dev/null)
-nb_packages_installed=$(echo "${apt_list_installed}" | wc -l)
+packages_installed=$(dpkg-query -W -f='${Package}\n' 2> /dev/null) # (list more packages than apt list --installed)
+nb_packages_installed=$(echo "${packages_installed}" | wc -l)
 
 # Check known unsafe files/folders/packages:
 
 # 1) known unsafe packages (adapt as needed)
-if echo "${apt_list_installed}" | grep -q "^vino"; then
+if echo "${packages_installed}" | grep -q "^vino"; then
     print_error "vino is installed (security risk)"
 fi
-if echo "${apt_list_installed}" | grep -q "^wine"; then
+if echo "${packages_installed}" | grep -q "^wine"; then
     print_error "wine is installed (security risk)"
 fi
-if echo "${apt_list_installed}" | grep -q "chrome"; then
+if echo "${packages_installed}" | grep -q "chrome"; then
     print_error "chrome is installed (snap chromium shall be preferred because open source)"
 fi
 if command -v kwallet-query &> /dev/null; then
@@ -1031,7 +1063,7 @@ dpkg -l | grep -v "fonts-hack" | grep -Ei "$SUSPICIOUS_KEYWORDS|inject" && print
 # Note: if you install external tools like chkrootkit package, complex rootkit detections can be done
 
 # In Ubuntu, snap is used by default instead of flatpak
-flatpak_packages=$(echo "${apt_list_installed}" | grep "flatpak")
+flatpak_packages=$(apt list --installed 2> /dev/null | grep "flatpak")
 if [ -n "$flatpak_packages" ]; then
     echo "$flatpak_packages"
     print_warning "above flatpak packages are installed (snap is preferred to flatpak in Ubuntu)"
