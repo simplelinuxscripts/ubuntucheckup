@@ -851,6 +851,21 @@ for pkg in $required_lo_pkgs; do
         error_found=1
     fi
 done
+# check LibreOffice extensions
+# (condition: <none> is not printed && there are actual extension lines after filtering)
+unopkg_list=$(unopkg list)
+if ( ! echo "$unopkg_list" | grep -q "<none>" ) && \
+   ( echo "$unopkg_list" | grep -Ev "^(All deployed|Identifier|$|<none>)" >/dev/null ); then
+    print_error "LibreOffice user extensions found ('unopkg list' to be run to see them)"
+    error_found=1
+fi
+unopkg_list_shared=$(sudo unopkg list --shared)
+if ( ! echo "$unopkg_list_shared" | grep -q "<none>" ) && \
+   ( echo "$unopkg_list_shared" | grep -Ev "^(All deployed|Identifier|$|<none>)" >/dev/null ); then
+    print_error "LibreOffice system‑wide extensions found ('sudo unopkg list --shared' to be run to see them)"
+    error_found=1
+fi
+# check LibreOffice KDE integration
 kde_plasma_installed=$(dpkg-query -W -f='${Status}\n' plasma-desktop plasma-workspace 2>/dev/null | grep -c "install ok installed")
 if [ "$kde_plasma_installed" -ne 0 ]; then
     # if KDE Plasma is installed, LibreOffice KDE integration package (libreoffice-kfX) must match the KDE Frameworks major version (X) for proper integration
