@@ -843,32 +843,38 @@ fi
 
 # Check libreoffice
 error_found=0
-# If KDE Plasma is installed, LibreOffice KDE integration package (libreoffice-kfX) must match the KDE Frameworks major version (X) for proper integration
-kde_plasma_installed=$(dpkg-query -W -f='${Status}\n' plasma-desktop plasma-workspace 2>/dev/null | grep -c "install ok installed")
-if [ "$kde_plasma_installed" -ne 0 ]; then
-    libreoffice_kf_packages=$(dpkg-query -W -f='${Package}\n' 'libreoffice-kf*' 2>/dev/null)
-    if [ "$libreoffice_kf_packages" == "" ]; then
-        print_error "LibreOffice KDE integration package (libreoffice-kfX) is missing"
-        error_found=1
-    else
-        # - extract LibreOffice KDE integration package (libreoffice-kfX) major version
-        libreoffice_kf_version=$(echo "$libreoffice_kf_packages" | sed -E 's/.*libreoffice-kf([0-9]).*/\1/' | sort -r | head -n1)
-        # - extract KDE Frameworks major version (highest available)
-        kde_frameworks_version=$(dpkg-query -W -f='${Package}\n' 'libkf*coreaddons*' | sed -En 's/.*libkf([0-9])coreaddons.*/\1/p' | sort -r | head -n1)
-        # - compare versions
-        if [ "$libreoffice_kf_version" != "$kde_frameworks_version" ]; then
-            print_error "Wrong LibreOffice KDE integration: libreoffice-kf$libreoffice_kf_version does not match KDE Frameworks version $kde_frameworks_version"
-            error_found=1
-        fi
-    fi
-fi
-required_lo_pkgs="libreoffice-core libreoffice-common libreoffice-writer libreoffice-calc libreoffice-impress"
+# check required LibreOffice packages
+required_lo_pkgs="libreoffice-core libreoffice-common libreoffice-writer libreoffice-calc libreoffice-impress libreoffice-gtk3"
 for pkg in $required_lo_pkgs; do
     if ! dpkg-query -W -f='${Status}' "$pkg" 2>/dev/null | grep -q "install ok installed"; then
         print_error "LibreOffice component missing: $pkg"
         error_found=1
     fi
 done
+kde_plasma_installed=$(dpkg-query -W -f='${Status}\n' plasma-desktop plasma-workspace 2>/dev/null | grep -c "install ok installed")
+if [ "$kde_plasma_installed" -ne 0 ]; then
+    # if KDE Plasma is installed, LibreOffice KDE integration package (libreoffice-kfX) must match the KDE Frameworks major version (X) for proper integration
+    libreoffice_kf_packages=$(dpkg-query -W -f='${Package}\n' 'libreoffice-kf*' 2>/dev/null)
+    if [ "$libreoffice_kf_packages" == "" ]; then
+        print_error "LibreOffice KDE integration package (libreoffice-kfX) is missing"
+        error_found=1
+    else
+        # - extract LibreOffice KDE integration package (libreoffice-kfX) major version
+        libreoffice_kf_version=$(echo "$libreoffice_kf_packages" | sed -E 's/.*libreoffice-kf([0-9]+).*/\1/' | sort -nr | head -n1)
+        # - extract KDE Frameworks major version (highest available)
+        kde_frameworks_version=$(dpkg-query -W -f='${Package}\n' 'libkf*coreaddons*' | sed -En 's/.*libkf([0-9]+)coreaddons.*/\1/p' | sort -nr | head -n1)
+        # - compare versions
+        if [ "$libreoffice_kf_version" != "$kde_frameworks_version" ]; then
+            print_error "Wrong LibreOffice KDE integration: libreoffice-kf$libreoffice_kf_version does not match KDE Frameworks version $kde_frameworks_version"
+            error_found=1
+        fi
+    fi
+    # check if KDE VCL plugin library exists
+    if ! ls /usr/lib*/libreoffice/program/libvclplug_kf*lo.so >/dev/null 2>&1; then
+        print_error "KDE VCL plugin library is missing"
+        error_found=1
+    fi
+fi
 if [ ${error_found} -eq 0 ]; then
     print_success "libreoffice install"
 fi
