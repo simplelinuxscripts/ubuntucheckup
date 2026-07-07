@@ -183,9 +183,9 @@ fi
 
 # Check if sessions were opened by other users
 # (gdm stands for GNOME Display Manager)
-sessions_opened_by_other_users=$(journalctl -u systemd-logind --no-pager | grep -i "New session" | grep -v "$(whoami)." | grep -v "user gdm." | grep -v "user sddm.")
+sessions_opened_by_other_users=$(journalctl -u systemd-logind --no-pager | grep -i "New session" | grep -v "$(whoami)." | grep -v "user gdm." | grep -v "user 'gdm'" | grep -v "user sddm." | grep -v "user 'sddm'")
 if [ -n "$sessions_opened_by_other_users" ]; then
-    echo "$sessions_opened_by_other_users" | awk '{print $NF}' | sort | uniq
+    echo "$sessions_opened_by_other_users"
     print_warning "sessions were opened by above other user(s)"
 else
     print_success "opened sessions"
