@@ -724,6 +724,12 @@ if [ -d "${SNAP_FIREFOX_PROFILE_FOLDER}" ]; then
         print_error "firefox ocsp query setting is disabled"
         error_found=1
     fi
+    # AI enhancements (option available in firefox settings / AI controls tab)
+    firefox_ai_enhancements_setting=$(cat ${SNAP_FIREFOX_PROFILE_FOLDER}/prefs.js | grep -i "browser.ai.control.default" | grep -i -P "blocked")
+    if [ -z "${firefox_ai_enhancements_setting}" ]; then
+        print_error "firefox AI enhancements setting is not blocked"
+        error_found=1
+    fi
 
     if [ ${error_found} -eq 0 ]; then
         print_success "firefox settings"
