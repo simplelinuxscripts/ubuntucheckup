@@ -308,9 +308,14 @@ echo "---------- Runtime check ----------"
 echo
 
 # Collect errors from journalctl (journalctl priorities: "emerg" (0), "alert" (1), "crit" (2), "err" (3), "warning" (4), "notice" (5), "info" (6), "debug" (7))
-print_info "most frequent critical errors:"
-journalctl -p 0..2 --since "7 days ago" > /tmp/journalctl_errors.log
-grep -oP '(?<=: ).*' /tmp/journalctl_errors.log | sed 's/for [0-9]*s/for XXs/g' | grep -v "password is required" | sort | uniq -c | sort -nr  | head -25 | awk '{$1=$1; print}' | sed 's/^/- /'
+journalctl -p 0..2 --since "14 days ago" > /tmp/journalctl_errors.log
+error_summary=$(grep -oP '(?<=: ).*' /tmp/journalctl_errors.log | sed 's/for [0-9]*s/for XXs/g' | grep -v "password is required" | sort | uniq -c | sort -nr  | head -25 | awk '{$1=$1; print}' | sed 's/^/- /')
+if [ -n "$error_summary" ]; then
+    print_info "most frequent critical errors:"
+    printf '%s\n\n' "$error_summary"
+else
+    print_success "no critical error in journaltcl"
+fi
 
 # Detect basic suspicious processes
 SUSPICIOUS_KEYWORDS='rootkit|snif|backd|stealth|keyl|logk|troj|virus|hack|malware|spy|\btap|tap\b|hide|hidden|cloak|transparent|lkl|uberkey|vlog|letterpress|sinister|tanit|keystroke|spy'
