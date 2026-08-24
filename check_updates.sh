@@ -61,6 +61,19 @@ fi
 read -p "Press Enter to continue..."
 echo
 
+# Check if firmware updates are available
+read -r -p "Check for firmware updates with fwupdmgr? [Y/n]: " answer
+case "$answer" in
+    [Yy]* | "" )
+        echo "Running fwupdmgr get-updates..."
+        fwupdmgr get-updates
+        ;;
+    * )
+        echo "Skipping firmware update check."
+        ;;
+esac
+echo "'sudo fwupdmgr update' to be run if some firmware updates are available"
+
 if [ "$VERBOSE" -eq 1 ]; then
     # Check logs of last unattended-upgrades automatic runs
     echo -e "Checking unattended-upgrades..."

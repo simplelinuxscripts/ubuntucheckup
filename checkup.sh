@@ -324,7 +324,7 @@ ps aux | grep -v "grep " | grep -Ei "$SUSPICIOUS_KEYWORDS|track|input|capture|sc
 
 # Detect processes that are still executing after their executable files have been removed (suspicious processes)
 find /proc/*/exe -lname '*(deleted)' 2>/dev/null | while read -r exe; do
-    print_error "suspicious process: deleted executable is still running: $exe"
+    print_warning "suspicious process: deleted executable is still running: $exe"
 done
 
 # Detect zombie processes
@@ -905,6 +905,13 @@ if [ ${error_found} -eq 0 ]; then
     print_success "libreoffice install"
 fi
 
+# Check interrupted package installations
+interrupted_pkgs=$(dpkg-query -W -f='${db:Status-Abbrev} ${Package}\n' 2>/dev/null | grep -E '^.[Uf]')
+if [ -n "$interrupted_pkgs" ]; then
+    echo "$interrupted_pkgs"
+    print_error "above package installations were interrupted ('sudo dpkg --configure -a' to be run)"
+fi
+
 # Check package files storage
 echo
 echo "checking package files storage..."
@@ -1124,6 +1131,13 @@ backports_packages=$(echo "${apt_cache_policy_all_packages}" | grep -B5 'backpor
 if [ -n "$backports_packages" ]; then
     echo "$backports_packages"
     print_error "backports packages are installed"
+fi
+
+# Check outdated cached packages
+autoclean_outdated_cached_packages=$(sudo apt-get -s autoclean 2>/dev/null | grep -E '^(Del|Free)')
+if [ -n "$autoclean_outdated_cached_packages" ]; then
+    echo "$autoclean_outdated_cached_packages"
+    print_warning "above cached packages are outdated ('sudo apt autoclean -y' to be run)"
 fi
 
 # Check obsolete packages
