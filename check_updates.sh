@@ -67,12 +67,13 @@ case "$answer" in
     [Yy]* | "" )
         echo "Running fwupdmgr get-updates..."
         fwupdmgr get-updates
+        echo
+        echo "'sudo fwupdmgr update' to be run if some firmware updates are available"
+        read -p "Press Enter to continue..."
         ;;
     * )
-        echo "Skipping firmware update check."
-        ;;
 esac
-echo "'sudo fwupdmgr update' to be run if some firmware updates are available"
+echo
 
 if [ "$VERBOSE" -eq 1 ]; then
     # Check logs of last unattended-upgrades automatic runs
