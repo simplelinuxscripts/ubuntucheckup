@@ -312,7 +312,7 @@ journalctl -p 0..2 --since "14 days ago" > /tmp/journalctl_errors.log
 error_summary=$(grep -oP '(?<=: ).*' /tmp/journalctl_errors.log | sed 's/for [0-9]*s/for XXs/g' | grep -v "password is required" | sort | uniq -c | sort -nr  | head -25 | awk '{$1=$1; print}' | sed 's/^/- /')
 if [ -n "$error_summary" ]; then
     print_info "most frequent critical errors:"
-    printf '%s\n\n' "$error_summary"
+    printf '%s\n' "$error_summary"
 else
     print_success "no critical error in journaltcl"
 fi
@@ -920,7 +920,7 @@ echo "checking package files storage..."
 #   1) dpkg -S /usr/share/icons/LoginIcons => package name is displayed like "ubuntu-mono: /usr/share/icons/LoginIcons"
 #   2) sudo apt reinstall ubuntu-mono => this command reinstalls the faulty package
 # - When difference cannot be avoided by reinstalling source package or is normal due to customization, grep -v is piped to below command
-dpkg_verify_status=$(sudo dpkg --verify | grep -v "/etc/apt/apt.conf.d/10periodic" | grep -v "/etc/cloud/templates/sources.list.debian.deb822.tmpl" | grep -v "/etc/cloud/templates/sources.list.ubuntu.deb822.tmpl" | grep -v "/etc/xdg/libkleopatrarc" | grep -v "/etc/update-manager/release-upgrades" | grep -v "/usr/lib/firmware/nvidia/")
+dpkg_verify_status=$(sudo dpkg --verify | grep -v "/etc/apt/apt.conf.d/10periodic" | grep -v "/etc/cloud/templates/sources.list.debian.deb822.tmpl" | grep -v "/etc/cloud/templates/sources.list.ubuntu.deb822.tmpl" | grep -v "/etc/xdg/libkleopatrarc" | grep -v "/etc/update-manager/release-upgrades" | grep -v "/usr/lib/firmware/nvidia/") | grep -v "/usr/share/kio/servicemenus/kompare.desktop"
 if [ -n "${dpkg_verify_status}" ]; then
     echo "${dpkg_verify_status}"
     print_error "errors in package files storage, possibly due to manual updates, file corruptions, file system errors on disk, see above (package reinstallation or package file restoration may be needed)"
@@ -1042,7 +1042,51 @@ nb_packages_installed=$(echo "${packages_installed}" | wc -l)
 
 # Check known unsafe files/folders/packages:
 
-# 1) known unsafe packages (adapt as needed)
+# 1a) Check non open-source (proprietary) licenses
+while read -r line; do
+    # Extract module name and license safely
+    m="${line%% *}"          # module name = first field
+    license="${line#* }"     # license = everything after first space (license can be multi-words)
+
+    if [[ -z "$m" ]] ; then
+        print_error "empty module listed"
+        break;
+    fi
+
+    # Normalize license
+    license_upper="${license^^}"
+
+    # No license declared
+    if [[ -z "$license" ]]; then
+        print_error "no license declared: $m"
+        continue
+    fi
+    # Unknown license
+    if [[ "$license_upper" == "UNKNOWN" ]]; then
+        print_error "unknown license: $m"
+        continue
+    fi
+    # Acceptable open-source license keywords
+    if [[ ! "$license_upper" =~ GPL ]]; then
+    # could be replaced by more general condition for open-source licenses: if [[ ! "$license_upper" =~ GPL|BSD|MIT|MPL|APACHE|DUAL ]]; then
+        print_error "non open-source license: $m ($license)"
+    fi
+done < <(
+    awk '{print $1}' /proc/modules |
+    while read -r mod; do
+        lic=$(modinfo -F license "$mod" 2>/dev/null)
+        echo "$mod $lic"
+    done
+)
+
+# 1b) Check if a proprietary software or another taint flag has been loaded into the running kernel
+# (bit 0 (TAINT_PROPRIETARY_MODULE) is the only taint bit that indicates proprietary code)
+taint_val=$(cat /proc/sys/kernel/tainted 2>/dev/null)
+if [[ -n "$taint_val" ]] && (( (taint_val & 1) != 0 )); then
+    print_error "proprietary software detected by taint flag ($taint_val)"
+fi
+
+# 2) known unsafe packages (adapt as needed)
 if echo "${packages_installed}" | grep -q "^vino"; then
     print_error "vino is installed (security risk)"
 fi
@@ -1059,7 +1103,7 @@ if command -v kwallet-query &> /dev/null; then
     fi
 fi
 
-# 2) known suspicious files or folders
+# 3) known suspicious files or folders
 known_suspicious_files=(
     # Known rootkit files
     "/usr/bin/ssh2" "/usr/sbin/in.telnetd" "/dev/.lib"
@@ -1096,25 +1140,39 @@ for elt in "${known_suspicious_files[@]}"; do
     fi
 done
 
-# 3) basic suspicious keywords in module names
+# 4) basic suspicious keywords in module names
 lsmod | grep -Ei "$SUSPICIOUS_KEYWORDS|inject" && print_error "suspicious module(s) found"
 dpkg -l | grep -v "fonts-hack" | grep -Ei "$SUSPICIOUS_KEYWORDS|inject" && print_error "suspicious package(s) found"
 # Note: if you install external tools like chkrootkit package, complex rootkit detections can be done
 
-# In Ubuntu, snap is used by default instead of flatpak
-flatpak_packages=$(apt list --installed 2> /dev/null | grep "flatpak")
-if [ -n "$flatpak_packages" ]; then
-    echo "$flatpak_packages"
-    print_warning "above flatpak packages are installed (snap is preferred to flatpak in Ubuntu)"
+# dmks is generally used to install modules for HW support in Ubuntu, but can introduce specific risks regarding stability, security, and system maintenance
+if command -v dkms &>/dev/null; then
+    dkms status
+    print_warning "dkms is installed"
+fi
+
+# Ubuntu ships snap by default, not flatpak
+if command -v flatpak &>/dev/null; then
+    flatpak list --app
+    print_warning "flatpak is installed (Ubuntu ships snap by default, not flatpak)"
 fi
 
 apt_cache_policy_all_packages=$(apt-cache policy $(dpkg-query -W -f='${binary:Package}\n'))
 
-# Check proprietary drivers for devices supported by Ubuntu but not open source
+# Check restricted packages
 restricted_packages=$(echo "${apt_cache_policy_all_packages}" | grep -B5 'restricted')
 if [ -n "$restricted_packages" ]; then
     echo "$restricted_packages"
     print_error "restricted packages are installed"
+fi
+
+# Check if some important drivers are missing, accepted exceptions are explicitly listed in below command
+hw_devices_without_driver=$(sudo lshw | grep -A1 UNCLAIMED | grep -v '^--$' | sed 's/^[[:space:]]*//' | paste - - | grep -v "System peripheral" | grep -v "RAM memory" | grep -v "OEM Define 1")
+if [ -n "$hw_devices_without_driver" ]; then
+    echo "$hw_devices_without_driver"
+    print_warning "above HW devices have no driver"
+else
+    print_success "drivers"
 fi
 
 # Check software not officially supported by Ubuntu
