@@ -920,7 +920,7 @@ echo "checking package files storage..."
 #   1) dpkg -S /usr/share/icons/LoginIcons => package name is displayed like "ubuntu-mono: /usr/share/icons/LoginIcons"
 #   2) sudo apt reinstall ubuntu-mono => this command reinstalls the faulty package
 # - When difference cannot be avoided by reinstalling source package or is normal due to customization, grep -v is piped to below command
-dpkg_verify_status=$(sudo dpkg --verify | grep -v "/etc/apt/apt.conf.d/10periodic" | grep -v "/etc/cloud/templates/sources.list.debian.deb822.tmpl" | grep -v "/etc/cloud/templates/sources.list.ubuntu.deb822.tmpl" | grep -v "/etc/xdg/libkleopatrarc" | grep -v "/etc/update-manager/release-upgrades" | grep -v "/usr/lib/firmware/nvidia/") | grep -v "/usr/share/kio/servicemenus/kompare.desktop"
+dpkg_verify_status=$(sudo dpkg --verify | grep -v "/etc/apt/apt.conf.d/10periodic" | grep -v "/etc/cloud/templates/sources.list.debian.deb822.tmpl" | grep -v "/etc/cloud/templates/sources.list.ubuntu.deb822.tmpl" | grep -v "/etc/xdg/libkleopatrarc" | grep -v "/etc/update-manager/release-upgrades" | grep -v "/usr/lib/firmware/nvidia/") | grep -v "/usr/share/kio/servicemenus/"
 if [ -n "${dpkg_verify_status}" ]; then
     echo "${dpkg_verify_status}"
     print_error "errors in package files storage, possibly due to manual updates, file corruptions, file system errors on disk, see above (package reinstallation or package file restoration may be needed)"
