@@ -16,7 +16,7 @@ export LC_ALL=en_US.UTF-8
 # Parameters
 ############
 
-# Adapt those parameter values as needed depending on your Ubuntu installation
+# => Adjust the parameter values below to match your Ubuntu configuration
 
 STOP_ON_WARNINGS=0
 STOP_ON_ERRORS=0
@@ -48,12 +48,12 @@ TEST_SUDO_PWD=1
 #       └─ubuntu--vg-ubuntu--lv 252:1    0 473.9G  0 lvm    /
 #   => disk device for root folder is nvme0n1
 #   => HARD_DISK_DEVICE shall be set to "/dev/nvme0n1"
-HARD_DISK_DEVICE="/dev/xxx"
+HARD_DISK_DEVICE="/dev/xxx"  # => replace xxx to match your Ubuntu configuration
 
 # Firefox snap settings folder
 SNAP_FOLDER="${HOME}/snap"
 SNAP_FIREFOX_FOLDER="${SNAP_FOLDER}/firefox/common/.mozilla/firefox"
-SNAP_FIREFOX_PROFILE_FOLDER="${SNAP_FIREFOX_FOLDER}/xxxxxxxx.default"
+SNAP_FIREFOX_PROFILE_FOLDER="${SNAP_FIREFOX_FOLDER}/xxxxxxxx.default" # => replace xxxxxxxx to match your Ubuntu configuration
 
 # Chromimum snap settings folder
 SNAP_CHROMIUM_FOLDER="${SNAP_FOLDER}/chromium/common/chromium/Default"
@@ -1157,35 +1157,53 @@ if command -v flatpak &>/dev/null; then
     print_warning "flatpak is installed (Ubuntu ships snap by default, not flatpak)"
 fi
 
-apt_cache_policy_all_packages=$(apt-cache policy $(dpkg-query -W -f='${binary:Package}\n'))
-
 # Check restricted packages
-restricted_packages=$(echo "${apt_cache_policy_all_packages}" | grep -B5 'restricted')
+restricted_packages=$(dpkg-query -W -f='${Package}\n' \
+    | xargs apt-cache policy 2>/dev/null \
+    | awk '/^[A-Za-z0-9]/ {pkg=$1} /\/restricted / {print pkg}' \
+    | tr -d ':')
 if [ -n "$restricted_packages" ]; then
     echo "$restricted_packages"
     print_error "restricted packages are installed"
 fi
 
-# Check if some important drivers are missing, accepted exceptions are explicitly listed in below command
-hw_devices_without_driver=$(sudo lshw | grep -A1 UNCLAIMED | grep -v '^--$' | sed 's/^[[:space:]]*//' | paste - - | grep -v "System peripheral" | grep -v "RAM memory" | grep -v "OEM Define 1")
-if [ -n "$hw_devices_without_driver" ]; then
-    echo "$hw_devices_without_driver"
-    print_warning "above HW devices have no driver"
-else
-    print_success "drivers"
-fi
-
-# Check software not officially supported by Ubuntu
-multiverse_packages=$(echo "${apt_cache_policy_all_packages}" | grep -B5 'multiverse')
+# Check multiverse packages (not officially supported by Ubuntu)
+multiverse_packages=$(dpkg-query -W -f='${Package}\n' \
+    | xargs apt-cache policy 2>/dev/null \
+    | awk '/^[A-Za-z0-9]/ {pkg=$1} /\/multiverse / {print pkg}' \
+    | tr -d ':')
 if [ -n "$multiverse_packages" ]; then
     echo "$multiverse_packages"
     print_error "multiverse packages are installed"
 fi
 
+# Check proposed packages
+proposed_packages=$(dpkg-query -W -f='${Package}\n' \
+    | xargs apt-cache policy 2>/dev/null \
+    | awk '/^[A-Za-z0-9]/ {pkg=$1} /\/proposed / {print pkg}' \
+    | tr -d ':')
+if [ -n "$proposed_packages" ]; then
+    echo "$proposed_packages"
+    print_error "proposed packages are installed"
+fi
+
+# Check experimental packages
+experimental_packages=$(dpkg-query -W -f='${Package}\n' \
+    | xargs apt-cache policy 2>/dev/null \
+    | awk '/^[A-Za-z0-9]/ {pkg=$1} /\/experimental / {print pkg}' \
+    | tr -d ':')
+if [ -n "$experimental_packages" ]; then
+    echo "$experimental_packages"
+    print_error "experimental packages are installed"
+fi
+
 # Check backports packages
 # oracular-backports software (manually installed packages from backports repository do not receive security updates / there can be occasionally compatibility issues => to avoid for stability and security reasons)
 # (backports repository can be seen in Software & Updates / Other Software tab, and shall not be removed if automatically listed here)
-backports_packages=$(echo "${apt_cache_policy_all_packages}" | grep -B5 'backports')
+backports_packages=$(dpkg-query -W -f='${Package}\n' \
+    | xargs apt-cache policy 2>/dev/null \
+    | awk '/^[A-Za-z0-9]/ {pkg=$1} /\/backports / {print pkg}' \
+    | tr -d ':')
 if [ -n "$backports_packages" ]; then
     echo "$backports_packages"
     print_error "backports packages are installed"
@@ -1209,6 +1227,15 @@ possibly_useless_packages=$(apt autoremove --dry-run 2> /dev/null | grep -P "(RE
 if [ -n "$possibly_useless_packages" ]; then
     echo "$possibly_useless_packages"
     print_warning "above packages may be useless ('sudo apt autoremove [--dry-run] --purge' to be run to remove them all)"
+fi
+
+# Check if some important drivers are missing, accepted exceptions are explicitly listed in below command
+hw_devices_without_driver=$(sudo lshw | grep -A1 UNCLAIMED | grep -v '^--$' | sed 's/^[[:space:]]*//' | paste - - | grep -v "System peripheral" | grep -v "RAM memory" | grep -v "OEM Define 1")
+if [ -n "$hw_devices_without_driver" ]; then
+    echo "$hw_devices_without_driver"
+    print_warning "above HW devices have no driver"
+else
+    print_success "drivers"
 fi
 
 # Check snap packages
