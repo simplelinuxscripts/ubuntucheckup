@@ -572,18 +572,18 @@ else
     print_warning "startup scripts check is skipped because reference files ${CHECKUP_FOLDER}/.profile and ${CHECKUP_FOLDER}/.bashrc do not exist"
 fi
 
-# Jobs scheduled with cron (adapt this check if legitimate jobs are scheduled)
-scheduled_cron_jobs=$(crontab -l 2>&1 | grep -v "no crontab for")
-if [ -n "${scheduled_cron_jobs}" ]; then
-    echo ${scheduled_cron_jobs}
-    print_error "unexpected jobs are scheduled with cron"
-fi
 # Timers
-# Note: those checks could be extended to anacron / other periodical mechanisms
 if [ -f "${CHECKUP_FOLDER}/timers_sauv.txt" ]; then
     error_found=0
-    systemctl list-timers --all | awk '{print $(NF-1), $NF}' 2> /dev/null > "${CHECKUP_FOLDER}/timers_current.txt"
-    diff <(sort "${CHECKUP_FOLDER}/timers_sauv.txt") <(sort "${CHECKUP_FOLDER}/timers_current.txt")
+
+    echo "----- All active and inactive system-level timers:" > "${CHECKUP_FOLDER}/timers_current.txt"
+    systemctl list-timers --all --no-legend --no-pager | awk '{print $(NF-1), $NF}' 2> /dev/null | sort >> "${CHECKUP_FOLDER}/timers_current.txt"
+    echo "----- All active and inactive timers for the current user:" >> "${CHECKUP_FOLDER}/timers_current.txt"
+    systemctl --user list-timers --all --no-legend --no-pager | awk '{print $(NF-1), $NF}' 2> /dev/null | sort >> "${CHECKUP_FOLDER}/timers_current.txt"
+    echo "----- All timer unit files on disk (system, user, offline, package-installed):" >> "${CHECKUP_FOLDER}/timers_current.txt"
+    sudo find /home /root /etc/systemd/ /usr/lib/systemd/ /usr/local/lib/systemd/ -name "*.timer" 2>/dev/null | sort >> "${CHECKUP_FOLDER}/timers_current.txt"
+
+    diff "${CHECKUP_FOLDER}/timers_sauv.txt" "${CHECKUP_FOLDER}/timers_current.txt"
     if [ $? -ne 0 ]; then
         print_error "timers have changed (check changes and copy file ${CHECKUP_FOLDER}/timers_current.txt to ${CHECKUP_FOLDER}/timers_sauv.txt)"
         error_found=1
@@ -594,6 +594,69 @@ if [ -f "${CHECKUP_FOLDER}/timers_sauv.txt" ]; then
     fi
 else
     print_warning "timers check is skipped because reference file ${CHECKUP_FOLDER}/timers_sauv.txt does not exist"
+fi
+
+# All scheduled jobs that are not timer‑based
+if [ -f "${CHECKUP_FOLDER}/scheduled_jobs_sauv.txt" ]; then
+    error_found=0
+
+    {
+        echo "----- User Crontabs:"
+        if sudo [ -d /var/spool/cron/crontabs ]; then
+            # Use sudo sh to handle globbing securely within the protected directory
+            sudo sh -c '
+                for user_file in /var/spool/cron/crontabs/*; do
+                    if [ -f "$user_file" ]; then
+                        echo "--- User: $(basename "$user_file") ---"
+                        grep -Ev "^(#|$)" "$user_file" 2>/dev/null
+                    fi
+                done
+            '
+        fi
+
+        echo "----- System-wide Cron (/etc/crontab & /etc/cron.d/*):"
+        if [ -f /etc/crontab ]; then
+            grep -Ev '^(#|$)' /etc/crontab 2>/dev/null
+        fi
+
+        if [ -d /etc/cron.d ]; then
+            # Enable nullglob to safely skip if directory is empty
+            shopt -s nullglob
+            for f in /etc/cron.d/*; do
+                if [ -f "$f" ]; then
+                    echo "- File: "$f
+                    grep -Ev '^(#|$)' "$f" 2>/dev/null
+                fi
+            done
+            # Cancels above shopt -s
+            shopt -u nullglob
+        fi
+
+        echo "----- Periodic cron scripts:"
+        for dir in /etc/cron.hourly /etc/cron.daily /etc/cron.weekly /etc/cron.monthly /etc/cron.yearly; do
+            if [ -d "${dir}" ]; then
+                echo "- Directory: ${dir}"
+                run-parts --test "${dir}" 2>/dev/null
+            fi
+        done
+
+        echo "----- Anacron config:"
+        if [ -f /etc/anacrontab ]; then
+            grep -Ev '^(#|$)' /etc/anacrontab 2>/dev/null
+        fi
+    } > "${CHECKUP_FOLDER}/scheduled_jobs_current.txt"
+    
+    diff "${CHECKUP_FOLDER}/scheduled_jobs_sauv.txt" "${CHECKUP_FOLDER}/scheduled_jobs_current.txt"
+    if [ $? -ne 0 ]; then
+        print_error "scheduled jobs have changed (check changes and copy file ${CHECKUP_FOLDER}/scheduled_jobs_current.txt to ${CHECKUP_FOLDER}/scheduled_jobs_sauv.txt)"
+        error_found=1
+    fi
+
+    if [ ${error_found} -eq 0 ]; then
+        print_success "scheduled jobs"
+    fi
+else
+    print_warning "scheduled jobs check is skipped because reference file ${CHECKUP_FOLDER}/scheduled_jobs_sauv.txt does not exist"
 fi
 
 # Check files with special SUID or SGID permissions. SUID (Set User ID) and SGID (Set Group ID) are special permission bits in Linux that allow executable files
