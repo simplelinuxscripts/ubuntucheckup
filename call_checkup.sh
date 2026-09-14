@@ -13,16 +13,16 @@ if [ -f "$TIMESTAMP_FILE" ]; then
     LAST_RUN=$(cat "$TIMESTAMP_FILE")
     NOW=$(date +%s)
     ELAPSED=$((NOW - LAST_RUN))
-    if [ "$ELAPSED" -lt "$MIN_TIME_BTW_2_EXECUTIONS" ]; then
-        exit 0
-    fi
-    
     LAST_RUN_TEXT=$(date -d "@$LAST_RUN" "+%d-%m-%Y")
     ELAPSED_DAYS=$((ELAPSED / 86400))
     if [ "$ELAPSED_DAYS" -le 1 ]; then
         ELAPSED_DAYS_TEXT="very recent"
     else
         ELAPSED_DAYS_TEXT="$ELAPSED_DAYS days ago"
+    fi
+    if [ "$ELAPSED" -lt "$MIN_TIME_BTW_2_EXECUTIONS" ]; then
+        echo "Last run was $ELAPSED_DAYS_TEXT ($LAST_RUN_TEXT), system checkup is skipped"
+        exit 0
     fi
 fi
 
