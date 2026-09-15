@@ -69,8 +69,16 @@ EXPECTED_USR_LOCAL_BIN_PROGRAMS=""
 SCRIPT_FOLDER=$(dirname "$0")
 CHECKUP_FOLDER="${SCRIPT_FOLDER}/checkup_files"
 
-# Extended checks (can be long)
-EXTENDED_CHECKS=0
+# Check mode (0: short, 1: normal, 2: long)
+CHECK_MODE=1
+if [ -n "$1" ]; then # check mode can be set by an optional parameter
+    if [[ "$1" =~ ^[0-2]$ ]]; then
+        CHECK_MODE="$1"
+    else
+        echo "invalid parameter: $1"
+        exit 1
+    fi
+fi
 
 ########
 # Script
@@ -994,10 +1002,10 @@ fi
 # Check MD5 checksums
 echo
 error_found=0
-if [ ${EXTENDED_CHECKS} -eq 0 ]; then
-    echo "checking MD5 checksums..."
+if [ ${CHECK_MODE} -eq 1 ]; then
+    echo "checking main MD5 checksums..."
 
-    # /lib and /usr/lib are not considered because processing can be long (set EXTENDED_CHECKS to 1 to check those folders too)
+    # /lib and /usr/lib are not considered because processing can be long (set CHECK_MODE to 2 to check those folders too)
     find /bin /sbin /usr/bin /usr/sbin -type f -exec md5sum {} \; > /tmp/md5sums
 
     critical_bins=(
@@ -1060,7 +1068,7 @@ if [ ${EXTENDED_CHECKS} -eq 0 ]; then
     if [ ${error_found} -eq 0 ]; then
         print_success "MD5 checksums"
     fi
-else
+elif [ ${CHECK_MODE} -eq 2 ]; then
     # Check all files with an associated MD5 checksum (in addition to above checks done by sudo dpkg --verify). This step can be long.
     # Can be replaced by "sudo debsums -s" if you installed the optional debsums package.
     echo "checking all possible MD5 checksums (can be long)..."
@@ -1098,6 +1106,8 @@ else
     if [ ${error_found} -eq 0 ]; then
         print_success "all possible MD5 checksums"
     fi
+else
+    print_warning "checking MD5 checksums... skipped due to short check mode"
 fi
 
 packages_installed=$(dpkg-query -W -f='${Package}\n' 2> /dev/null) # (list more packages than apt list --installed)
@@ -1478,67 +1488,70 @@ fi
 
 # Check installed packages in details
 echo
-echo "checking installed packages in details..."
-packages_with_updates_disabled=$(apt-mark showhold)
-if [ -n "${packages_with_updates_disabled}" ]; then
-    echo "${packages_with_updates_disabled}"
-    print_error "above packages have updates disabled ('sudo apt-mark unhold' to be run to enable updates)"
-fi
-package_index=1
-virtual_packages=""
-nb_virtual_packages=0
-for pkg in $(dpkg-query -W -f='${binary:Package}\n'); do
-    pkg_policy=$(apt-cache policy "${pkg}")
-    package_errors_str=""
-    # Not-authenticated packages
-    if ! $(echo "${pkg_policy}" | grep -q "500 http"); then
-        package_errors_str="non-authenticated! ${package_errors_str}"
+if [ ${CHECK_MODE} -ne 0 ]; then
+    echo "checking installed packages in details..."
+    packages_with_updates_disabled=$(apt-mark showhold)
+    if [ -n "${packages_with_updates_disabled}" ]; then
+        echo "${packages_with_updates_disabled}"
+        print_error "above packages have updates disabled ('sudo apt-mark unhold' to be run to enable updates)"
     fi
-    repo_url=$(echo "${pkg_policy}" | grep -P "(http|https)://[^ ]+")
-    # echo "${pkg}: ${repo_url}"
-    if [ -z "${repo_url}" ]; then
-        package_errors_str="no URL! ${package_errors_str}"
-    fi
-    # Official repository URLs as in ubuntu.sources file
-    if echo "${repo_url}" | grep -v "http://archive.ubuntu.com/ubuntu" | grep -v "http://security.ubuntu.com/ubuntu" > /dev/null; then
-        package_errors_str="non-official! ${package_errors_str}"
-    fi
-    if [ -n "${package_errors_str}" ]; then
-        # Handle virtual packages like:
-        # linux-image-*-generic
-        # linux-modules-*-generic
-        # linux-modules-extra-*-generic ...
-        virtual_package=$(apt show "${pkg}" 2> /dev/null)
-        virtual_package_status=$(echo "${virtual_package}" | grep "State: not a real package (virtual)")
-        not_installed_status=$(echo "${pkg_policy}" | grep "Installed: (none)")
-        if [ -n "${virtual_package_status}" ] && [ -n "${not_installed_status}" ]; then
-            # print_info "${package_errors_str}for virtual package ${pkg}"
-            virtual_packages="${virtual_packages} ${pkg}"
-            nb_virtual_packages=$((nb_virtual_packages+1))
-        else
-            print_error "${package_errors_str}for package ${pkg}"
+    package_index=1
+    virtual_packages=""
+    nb_virtual_packages=0
+    for pkg in $(dpkg-query -W -f='${binary:Package}\n'); do
+        pkg_policy=$(apt-cache policy "${pkg}")
+        package_errors_str=""
+        # Not-authenticated packages
+        if ! $(echo "${pkg_policy}" | grep -q "500 http"); then
+            package_errors_str="non-authenticated! ${package_errors_str}"
         fi
-    fi
+        repo_url=$(echo "${pkg_policy}" | grep -P "(http|https)://[^ ]+")
+        # echo "${pkg}: ${repo_url}"
+        if [ -z "${repo_url}" ]; then
+            package_errors_str="no URL! ${package_errors_str}"
+        fi
+        # Official repository URLs as in ubuntu.sources file
+        if echo "${repo_url}" | grep -v "http://archive.ubuntu.com/ubuntu" | grep -v "http://security.ubuntu.com/ubuntu" > /dev/null; then
+            package_errors_str="non-official! ${package_errors_str}"
+        fi
+        if [ -n "${package_errors_str}" ]; then
+            # Handle virtual packages like:
+            # linux-image-*-generic
+            # linux-modules-*-generic
+            # linux-modules-extra-*-generic ...
+            virtual_package=$(apt show "${pkg}" 2> /dev/null)
+            virtual_package_status=$(echo "${virtual_package}" | grep "State: not a real package (virtual)")
+            not_installed_status=$(echo "${pkg_policy}" | grep "Installed: (none)")
+            if [ -n "${virtual_package_status}" ] && [ -n "${not_installed_status}" ]; then
+                # print_info "${package_errors_str}for virtual package ${pkg}"
+                virtual_packages="${virtual_packages} ${pkg}"
+                nb_virtual_packages=$((nb_virtual_packages+1))
+            else
+                print_error "${package_errors_str}for package ${pkg}"
+            fi
+        fi
 
-    # PPA (Personal Package Archive) packages (e.g. http://ppa.xxx) not available in official ubuntu repositories
-    # example of PPA package: http://ppa.launchpad.net/libreoffice/ppa/...
-    if echo "${repo_url}" | grep -q "/ppa"; then
-        print_error "PPA package is installed (/ppa): ${pkg}"
-    elif echo "${repo_url}" | grep -q "launchpad.net"; then
-        print_error "PPA package is installed (launchpad.net): ${pkg}"
-    fi
+        # PPA (Personal Package Archive) packages (e.g. http://ppa.xxx) not available in official ubuntu repositories
+        # example of PPA package: http://ppa.launchpad.net/libreoffice/ppa/...
+        if echo "${repo_url}" | grep -q "/ppa"; then
+            print_error "PPA package is installed (/ppa): ${pkg}"
+        elif echo "${repo_url}" | grep -q "launchpad.net"; then
+            print_error "PPA package is installed (launchpad.net): ${pkg}"
+        fi
 
-    percentage=$((100 * package_index / nb_packages_installed))
-    if (( package_index == 50 )) || (( package_index == 100 )) || (( package_index == 200 )) || (( package_index % 400 == 0 )) || (( package_index == nb_packages_installed )); then
-        echo "${percentage}% (${package_index}/${nb_packages_installed})"
+        percentage=$((100 * package_index / nb_packages_installed))
+        if (( package_index == 50 )) || (( package_index == 100 )) || (( package_index == 200 )) || (( package_index % 400 == 0 )) || (( package_index == nb_packages_installed )); then
+            echo "${percentage}% (${package_index}/${nb_packages_installed})"
+        fi
+        package_index=$((package_index+1))
+    done
+    if ! [ "${virtual_packages}" == "" ]; then
+        print_info "${nb_virtual_packages} virtual package(s):${virtual_packages}"
     fi
-    package_index=$((package_index+1))
-done
-if ! [ "${virtual_packages}" == "" ]; then
-    print_info "${nb_virtual_packages} virtual package(s):${virtual_packages}"
+    print_success "installed packages (see above logs for any warnings/errors)"
+else
+    print_warning "checking installed packages in details... skipped due to short check mode"
 fi
-print_success "installed packages (see above logs for any warnings/errors)"
-
 echo
 
 warning_str="warning"
