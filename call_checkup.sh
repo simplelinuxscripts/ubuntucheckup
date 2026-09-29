@@ -1,8 +1,11 @@
 #!/bin/bash
 
-###############################
-# Call checkup.sh conditionally
-###############################
+#################################################
+# Call checkup.sh if it was not executed recently
+# (can be run for example at each system startup)
+#################################################
+
+sleep 5
 
 SCRIPT_FOLDER=$(dirname "$0")
 TIMESTAMP_FILE="$SCRIPT_FOLDER/_last_checkup_run.txt"
