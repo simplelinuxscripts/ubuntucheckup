@@ -5,8 +5,6 @@
 # (can be run for example at each system startup)
 #################################################
 
-sleep 5
-
 SCRIPT_FOLDER=$(dirname "$0")
 TIMESTAMP_FILE="$SCRIPT_FOLDER/_last_checkup_run.txt"
 
@@ -33,6 +31,7 @@ if [ "$1" != "-forced" ]; then
         fi
     fi
 
+    sleep 5
     if ! zenity --question --text="Do you want to do a system checkup?\nLast run was $ELAPSED_DAYS_TEXT ($LAST_RUN_TEXT)"; then
         exit 0
     fi
