@@ -502,21 +502,35 @@ else
 fi
 
 # Check startup applications and services
-# system-wide autostart folder: /etc/xdg/autostart: not checked (contains for example update-notifier.desktop, snap-userd-autostart.desktop, org.kde.discover.notifier.desktop)
+# system-wide autostart folder: /etc/xdg/autostart:
+if [ -d "${CHECKUP_FOLDER}/etc/xdg/autostart" ]; then
+    error_found=0
+    diff -rU 0 "${CHECKUP_FOLDER}/etc/xdg/autostart" "/etc/xdg/autostart"
+    if [ $? -ne 0 ]; then
+        print_error "startup applications (system-wide) have changed (check changes and copy folder /etc/xdg/autostart to ${CHECKUP_FOLDER}/etc/xdg/autostart"
+        error_found=1
+    fi
+
+    if [ ${error_found} -eq 0 ]; then
+        print_success "startup applications (system-wide)"
+    fi
+else
+    print_warning "startup applications check (system-wide) is skipped because reference folder ${CHECKUP_FOLDER}/etc/xdg/autostart does not exist"
+fi
 # user-specific autostart folder: ~/.config/autostart
 if [ -d "${CHECKUP_FOLDER}/.config/autostart" ]; then
     error_found=0
     diff -rU 0 "${CHECKUP_FOLDER}/.config/autostart" "${HOME}/.config/autostart/"
     if [ $? -ne 0 ]; then
-        print_error "startup applications have changed (check changes and copy file ${HOME}/.config/autostart/ to ${CHECKUP_FOLDER}/.config/autostart)"
+        print_error "startup applications (user-specific) have changed (check changes and copy folder ${HOME}/.config/autostart/ to ${CHECKUP_FOLDER}/.config/autostart)"
         error_found=1
     fi
 
     if [ ${error_found} -eq 0 ]; then
-        print_success "startup applications"
+        print_success "startup applications (user-specific)"
     fi
 else
-    print_warning "startup applications check is skipped because reference folder ${CHECKUP_FOLDER}/.config/autostart does not exist"
+    print_warning "startup applications check (user-specific) is skipped because reference folder ${CHECKUP_FOLDER}/.config/autostart does not exist"
 fi
 if [ -f "${CHECKUP_FOLDER}/systemctl_services_enabled_sauv.txt" ]; then
     error_found=0
