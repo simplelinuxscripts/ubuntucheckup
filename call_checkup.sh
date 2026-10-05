@@ -8,7 +8,7 @@
 SCRIPT_FOLDER=$(dirname "$0")
 TIMESTAMP_FILE="$SCRIPT_FOLDER/_last_checkup_run.txt"
 
-MIN_TIME_BTW_2_EXECUTIONS=$((21 * 24 * 3600)) # 21 days
+MIN_TIME_BTW_2_EXECUTIONS=$((20 * 24 * 3600)) # 20 days
 LAST_RUN_TEXT="N.A."
 ELAPSED_DAYS_TEXT="N.A."
 
