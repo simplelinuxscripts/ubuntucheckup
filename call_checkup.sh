@@ -37,8 +37,10 @@ if ! zenity --question --text="Do you want to do a system checkup?\nLast run was
     exit 0
 fi
 
-# Run checkup
-$SCRIPT_FOLDER/checkup.sh
-
-# Update or create timestamp file with current time in seconds
-date +%s > "$TIMESTAMP_FILE"
+# Run checkup + update or create timestamp file with current time in seconds if success
+# Replace konsole by another terminal emulator if not in KDE Plasma
+if command -v konsole >/dev/null 2>&1; then
+    konsole --noclose -e bash -c "$SCRIPT_FOLDER/checkup.sh && date +%s > \"$TIMESTAMP_FILE\""
+else
+    echo "ERROR: konsole command not found"
+fi
