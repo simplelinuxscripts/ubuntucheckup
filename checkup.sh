@@ -522,7 +522,7 @@ if [ -d "${CHECKUP_FOLDER}/.config/autostart" ]; then
     error_found=0
     diff -rU 0 "${CHECKUP_FOLDER}/.config/autostart" "${HOME}/.config/autostart/"
     if [ $? -ne 0 ]; then
-        print_error "startup applications (user-specific) have changed (check changes and copy folder ${HOME}/.config/autostart/ to ${CHECKUP_FOLDER}/.config/autostart)"
+        print_error "startup applications (user-specific) have changed (check changes and copy folder ${HOME}/.config/autostart to ${CHECKUP_FOLDER}/.config/autostart)"
         error_found=1
     fi
 
@@ -704,7 +704,7 @@ else
     print_error "PATH environment variable has changed"
 fi
 
-# Check if /usr/local/sbin and /usr/local/bin folders contents
+# Check /usr/local/sbin and /usr/local/bin folders contents
 # This check is particularly useful if those folders are at the start of PATH environment variable before /usr/sbin and /usr/bin,
 # for security reasons as they take precedence over programs installed by the system's package manager
 # (adapt this check if programs in /usr/local/[s]bin folders are legitimate)
@@ -737,6 +737,25 @@ if ! [ "$file_list" == "$EXPECTED_USR_LOCAL_BIN_PROGRAMS_INSTALLED" ]; then
 fi
 if [ ${error_found} -eq 0 ]; then
     print_success "/usr/local/[s]bin folders contents"
+fi
+
+# Check ~/.local/share/applications (~/.local/share/applications takes precedence over /usr/share/applications)
+file_list=$(ls -A "${HOME}/.local/share/applications")
+if ! [ -z "$file_list" ]; then
+    if [ -d "${CHECKUP_FOLDER}/.local/share/applications" ]; then
+        error_found=0
+        diff -rU 0 "${CHECKUP_FOLDER}/.local/share/applications" "${HOME}/.local/share/applications"
+        if [ $? -ne 0 ]; then
+            print_error "local share applications have changed (check changes and copy folder ${HOME}/.local/share/applications to ${CHECKUP_FOLDER}/.local/share/applications)"
+            error_found=1
+        fi
+
+        if [ ${error_found} -eq 0 ]; then
+            print_success "local share applications"
+        fi
+    else
+        print_warning "local share applications check is skipped because reference folder ${CHECKUP_FOLDER}/.local/share/applications does not exist"
+    fi
 fi
 
 # Check "apt-get check" output
