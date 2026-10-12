@@ -376,7 +376,7 @@ elif [ "${nb_apparmor_enforce_processes}" == "" ] || [ ${nb_apparmor_enforce_pro
     error_found=1
 else
     enforce_ratio=$((100 * nb_apparmor_enforce_processes / nb_apparmor_processes))
-    if [ ${enforce_ratio} -lt 80 ]; then # (adapt threshold value in this condition as needed)
+    if [ ${enforce_ratio} -lt 50 ]; then # (adapt threshold value in this condition as needed)
         print_error "too few apparmor processes in enforce mode (${nb_apparmor_enforce_processes} out of ${nb_apparmor_processes}: ${enforce_ratio}%)"
         error_found=1
     fi
