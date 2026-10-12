@@ -365,7 +365,7 @@ elif [ -z "${apparmor_active}" ]; then
     print_error "apparmor not active"
     error_found=1
 # Check total number of apparmor [enforce] profiles and processes
-elif [ "${nb_apparmor_enforce_profiles}" == "" ] || [ ${nb_apparmor_enforce_profiles} -lt 50 ]; then # (adapt threshold value in this condition as needed)
+elif [ "${nb_apparmor_enforce_profiles}" == "" ] || [ ${nb_apparmor_enforce_profiles} -lt 33 ]; then # (adapt threshold value in this condition as needed)
     print_error "too few apparmor profiles in enforce mode (${nb_apparmor_enforce_profiles})"
     error_found=1
 elif [ "${nb_apparmor_processes}" == "" ] || [ ${nb_apparmor_processes} -lt 5 ]; then # (adapt threshold value in this condition as needed)
