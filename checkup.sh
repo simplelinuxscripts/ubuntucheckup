@@ -365,7 +365,7 @@ elif [ -z "${apparmor_active}" ]; then
     print_error "apparmor not active"
     error_found=1
 # Check total number of apparmor [enforce] profiles and processes
-elif [ "${nb_apparmor_enforce_profiles}" == "" ] || [ ${nb_apparmor_enforce_profiles} -lt 33 ]; then # (adapt threshold value in this condition as needed)
+elif [ "${nb_apparmor_enforce_profiles}" == "" ] || [ ${nb_apparmor_enforce_profiles} -lt 50 ]; then # (adapt threshold value in this condition as needed)
     print_error "too few apparmor profiles in enforce mode (${nb_apparmor_enforce_profiles})"
     error_found=1
 elif [ "${nb_apparmor_processes}" == "" ] || [ ${nb_apparmor_processes} -lt 5 ]; then # (adapt threshold value in this condition as needed)
@@ -376,7 +376,7 @@ elif [ "${nb_apparmor_enforce_processes}" == "" ] || [ ${nb_apparmor_enforce_pro
     error_found=1
 else
     enforce_ratio=$((100 * nb_apparmor_enforce_processes / nb_apparmor_processes))
-    if [ ${enforce_ratio} -lt 50 ]; then # (adapt threshold value in this condition as needed)
+    if [ ${enforce_ratio} -lt 33 ]; then # (adapt threshold value in this condition as needed)
         print_error "too few apparmor processes in enforce mode (${nb_apparmor_enforce_processes} out of ${nb_apparmor_processes}: ${enforce_ratio}%)"
         error_found=1
     fi
@@ -696,12 +696,21 @@ else
 fi
 
 # Check PATH environment variable
-if [ "$PATH" == "$EXPECTED_PATH" ]; then
-    print_success "PATH environment variable"
-else
+error_found=0
+if [ -f "/etc/environment" ]; then
+    if grep -vE '^[[:space:]]*(#|$)' /etc/environment | grep -qEv '^PATH='; then # check to adapt if /etc/environment file sets more environment variables than PATH
+        print_error "/etc/environment does not only set PATH environment variable"
+        error_found=1
+    fi
+fi
+if [ "$PATH" != "$EXPECTED_PATH" ]; then
     echo "expected PATH: $EXPECTED_PATH"
     echo "current PATH:  $PATH"
     print_error "PATH environment variable has changed"
+    error_found=1
+fi
+if [ ${error_found} -eq 0 ]; then
+    print_success "PATH environment variable"
 fi
 
 # Check /usr/local/sbin and /usr/local/bin folders contents
@@ -980,15 +989,12 @@ if ( ! echo "$unopkg_list_shared" | grep -q "<none>" ) && \
     print_error "LibreOffice system‑wide extensions found ('sudo unopkg list --shared' to be run to see them)"
     error_found=1
 fi
-# check LibreOffice KDE integration
+# check LibreOffice KDE integration packages if any - they may or may not be installed, as they may be unstable and libreoffice-gtk3 may then be preferred
 kde_plasma_installed=$(dpkg-query -W -f='${Status}\n' plasma-desktop plasma-workspace 2>/dev/null | grep -c "install ok installed")
 if [ "$kde_plasma_installed" -ne 0 ]; then
     # if KDE Plasma is installed, LibreOffice KDE integration package (libreoffice-kfX) must match the KDE Frameworks major version (X) for proper integration
-    libreoffice_kf_packages=$(dpkg-query -W -f='${Package}\n' 'libreoffice-kf*' 2>/dev/null)
-    if [ "$libreoffice_kf_packages" == "" ]; then
-        print_error "LibreOffice KDE integration package (libreoffice-kfX) is missing"
-        error_found=1
-    else
+    libreoffice_kf_packages=$(dpkg-query -W -f='${Status} ${Package}\n' 'libreoffice-kf*' 2>/dev/null | grep '^install ok installed' | awk '{print $4}')
+    if [ "$libreoffice_kf_packages" != "" ]; then # LibreOffice KDE integration package (libreoffice-kfX) installed
         # - extract LibreOffice KDE integration package (libreoffice-kfX) major version
         libreoffice_kf_version=$(echo "$libreoffice_kf_packages" | sed -E 's/.*libreoffice-kf([0-9]+).*/\1/' | sort -nr | head -n1)
         # - extract KDE Frameworks major version (highest available)
@@ -998,11 +1004,17 @@ if [ "$kde_plasma_installed" -ne 0 ]; then
             print_error "Wrong LibreOffice KDE integration: libreoffice-kf$libreoffice_kf_version does not match KDE Frameworks version $kde_frameworks_version"
             error_found=1
         fi
-    fi
-    # check if KDE VCL plugin library exists
-    if ! ls /usr/lib*/libreoffice/program/libvclplug_kf*lo.so >/dev/null 2>&1; then
-        print_error "KDE VCL plugin library is missing"
-        error_found=1
+        # check if KDE VCL plugin library exists
+        if ! ls /usr/lib*/libreoffice/program/libvclplug_kf*lo.so >/dev/null 2>&1; then
+            print_error "KDE VCL plugin library is missing"
+            error_found=1
+        fi
+    else # else a LibreOffice GTK integration package (libreoffice-gtX) shall be installed
+        libreoffice_gtk_packages=$(dpkg-query -W -f='${Status} ${Package}\n' 'libreoffice-gtk*' 2>/dev/null | grep '^install ok installed')
+        if [ "$libreoffice_gtk_packages" == "" ]; then
+            print_error "No LibreOffice GTK integration package installed"
+            error_found=1
+        fi
     fi
 fi
 if [ ${error_found} -eq 0 ]; then
