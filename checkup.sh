@@ -315,6 +315,15 @@ echo
 echo "---------- Runtime check ----------"
 echo
 
+# RAM usage
+read -r mem_total mem_avail < <(awk '/MemTotal/{t=$2} /MemAvailable/{a=$2} END{print t, a}' /proc/meminfo)
+ram_usage=$(( (mem_total - mem_avail) * 100 / mem_total ))
+if [ "$ram_usage" -ge 75 ]; then
+    print_warning "RAM usage is high: $ram_usage%"
+else
+    print_success "RAM usage ($ram_usage%)"
+fi
+
 # Collect errors from journalctl (journalctl priorities: "emerg" (0), "alert" (1), "crit" (2), "err" (3), "warning" (4), "notice" (5), "info" (6), "debug" (7))
 journalctl -p 0..2 --since "14 days ago" > /tmp/journalctl_errors.log
 error_summary=$(grep -oP '(?<=: ).*' /tmp/journalctl_errors.log | sed 's/for [0-9]*s/for XXs/g' | grep -v "password is required" | sort | uniq -c | sort -nr  | head -25 | awk '{$1=$1; print}' | sed 's/^/- /')
@@ -327,7 +336,7 @@ fi
 
 # Detect basic suspicious processes
 SUSPICIOUS_KEYWORDS='rootkit|snif|backd|stealth|keyl|logk|troj|virus|hack|malware|spy|\btap|tap\b|hide|hidden|cloak|transparent|lkl|uberkey|vlog|letterpress|sinister|tanit|keystroke|spy'
-ps aux | grep -v "grep " | grep -Ei "$SUSPICIOUS_KEYWORDS|track|input|capture|scan|record|hook" && print_error "suspicious process(es) found"
+ps aux | grep -v "grep " | grep -Ei "$SUSPICIOUS_KEYWORDS|track|input|capture|scan|record|hook" && print_warning "suspicious process(es) found"
 # Note: if you install external tools like chkrootkit package, complex rootkit detections can be done
 
 # Detect processes that are still executing after their executable files have been removed (suspicious processes)
@@ -457,6 +466,35 @@ if [ -d "${CHECKUP_FOLDER}/etc/apt/sources.list.d" ]; then
     fi
 else
     print_warning "repository list check is skipped because reference folder ${CHECKUP_FOLDER}/etc/apt/sources.list.d does not exist"
+fi
+
+# systemd
+if command -v systemctl &> /dev/null; then
+    while true; do
+        system_state=$(systemctl is-system-running 2>/dev/null)
+        if [ "$system_state" != "starting" ]; then
+            break
+        fi
+        echo "system is still starting... waiting 10s"
+        sleep 10
+    done
+    error_found=0
+    if ! [ "$system_state" == "running" ]; then
+        print_error "system state is not running: $system_state"
+        error_found=1
+    fi
+    # (systemctl --failed is useful to investigate degraded state)
+    system_failed=$(systemctl --failed --no-legend --plain)
+    if [ -n "$system_failed" ]; then
+        print_error "system failures:"
+        echo "$system_failed" 
+        error_found=1
+    fi
+    if [ ${error_found} -eq 0 ]; then
+        print_success "systemd"
+    fi
+else
+    print_error "systemd is not installed"
 fi
 
 # Check software updates
