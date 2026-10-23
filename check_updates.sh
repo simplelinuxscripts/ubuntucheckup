@@ -46,6 +46,12 @@ echo -e "Checking snap packages..."
 if [ "$VERBOSE" -eq 1 ]; then
     echo "- snap refresh times: $(snap refresh --time | sed 's/^/  /' | tr '\n' ' ')"
 fi
+
+snap_changes_failures=$(snap changes | grep -v "Done" | grep -v "Spawn")
+if [ -n "${snap_changes_failures}" ]; then
+    print_warning "snap changes failed in the past ('sudo snap refresh' + 'snap changes' to be run if needed):"
+    snap changes | sed "/Error/s/.*/${BOLD}&${NC}/"
+fi
 snap_packages_that_can_be_updated=$(snap refresh --list 2>&1 | grep -v "All snaps up to date")
 # example:
 #   snap refresh --list
