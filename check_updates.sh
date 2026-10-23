@@ -49,7 +49,7 @@ fi
 
 snap_changes_failures=$(snap changes | grep -v "Done" | grep -v "Spawn")
 if [ -n "${snap_changes_failures}" ]; then
-    print_warning "snap changes failed in the past ('sudo snap refresh' + 'snap changes' to be run if needed):"
+    print_warning "snap changes failed in the past (if needed, 'sudo snap refresh' to be run after having closed the applications, then 'snap changes' for check):"
     snap changes | sed "/Error/s/.*/${BOLD}&${NC}/"
 fi
 snap_packages_that_can_be_updated=$(snap refresh --list 2>&1 | grep -v "All snaps up to date")
