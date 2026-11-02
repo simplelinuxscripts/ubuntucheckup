@@ -352,7 +352,7 @@ if [ -n "$zombie_processes" ]; then
     print_warning "above zombie processes were detected"
 fi
 
-# Check all X11 applications currently connected to XWayland (or any X11 server running on the system), as they are less safe than wayland apps
+# Check all X11 applications currently connected to Xwayland (or any X11 server running on the system), as they are less safe than wayland apps
 if [ "${XDG_SESSION_TYPE:-}" != "x11" ]; then # In case of X11 session, every app is an X11 client, so this check is not meaningful
     x11_processes=$(sudo ss -xpH | awk '$5 ~ /X11-unix/ {peer[$8]=1} {line[NR]=$0; ino[NR]=$6} END{for(i=1;i<=NR;i++) if (ino[i] in peer) print line[i]}' | grep -oP 'users:\(.*' | sed 's/^[[:space:]]*//; s/[[:space:]]*$//' | sort -u)
     if [ -z "${x11_processes}" ]; then
@@ -360,7 +360,7 @@ if [ "${XDG_SESSION_TYPE:-}" != "x11" ]; then # In case of X11 session, every ap
     else
         # Classic X11 apps in KDE and GNOME
         allowed_x11_processes=(
-        "soffice\.bin"
+        "soffice\.bin" # remove it if you run Libreoffice in wayland
         "gmenudbusmenupr" "kaccess" "kded6" "ksmserver" "xembedsniproxy" "xsettingsd"
         "gnome-shell" "gnome-session-b" "mutter-x11-fram" "gnome-settings-"
         "gsd-"
@@ -378,6 +378,8 @@ if [ "${XDG_SESSION_TYPE:-}" != "x11" ]; then # In case of X11 session, every ap
         if [ -n "${filtered_x11_processes}" ]; then
             print_error "unexpected X11 processes found:"
             echo "$filtered_x11_processes"
+        else
+            print_success "Xwayland apps"
         fi
     fi
 fi
