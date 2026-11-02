@@ -361,7 +361,7 @@ if [ "${XDG_SESSION_TYPE:-}" != "x11" ]; then # In case of X11 session, every ap
         # Classic X11 apps in KDE and GNOME
         allowed_x11_processes=(
         "soffice\.bin" # remove it if you run Libreoffice in wayland
-        "gmenudbusmenupr" "kaccess" "kded6" "ksmserver" "xembedsniproxy" "xsettingsd"
+        "gmenudbusmenupr" "kaccess" "kded6" "kioworker" "ksmserver" "xembedsniproxy" "xsettingsd"
         "gnome-shell" "gnome-session-b" "mutter-x11-fram" "gnome-settings-"
         "gsd-"
         "ibus-daemon" "ibus-x11" "ibus-extension" "at-spi2-registr"
@@ -376,7 +376,7 @@ if [ "${XDG_SESSION_TYPE:-}" != "x11" ]; then # In case of X11 session, every ap
 
         filtered_x11_processes=$(echo "$x11_processes" | grep -v -E "$allowed_pattern")
         if [ -n "${filtered_x11_processes}" ]; then
-            print_error "unexpected X11 processes found:"
+            print_warning "unexpected X11 processes found:"
             echo "$filtered_x11_processes"
         else
             print_success "Xwayland apps"
