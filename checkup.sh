@@ -352,6 +352,36 @@ if [ -n "$zombie_processes" ]; then
     print_warning "above zombie processes were detected"
 fi
 
+# Check all X11 applications currently connected to XWayland (or any X11 server running on the system), as they are less safe than wayland apps
+if [ "${XDG_SESSION_TYPE:-}" != "x11" ]; then # In case of X11 session, every app is an X11 client, so this check is not meaningful
+    x11_processes=$(sudo ss -xpH | awk '$5 ~ /X11-unix/ {peer[$8]=1} {line[NR]=$0; ino[NR]=$6} END{for(i=1;i<=NR;i++) if (ino[i] in peer) print line[i]}' | grep -oP 'users:\(.*' | sed 's/^[[:space:]]*//; s/[[:space:]]*$//' | sort -u)
+    if [ -z "${x11_processes}" ]; then
+        print_warning "no X11 process found"
+    else
+        # Classic X11 apps in KDE and GNOME
+        allowed_x11_processes=(
+        "soffice\.bin"
+        "gmenudbusmenupr" "kaccess" "kded6" "ksmserver" "xembedsniproxy" "xsettingsd"
+        "gnome-shell" "gnome-session-b" "mutter-x11-fram" "gnome-settings-"
+        "gsd-"
+        "ibus-daemon" "ibus-x11" "ibus-extension" "at-spi2-registr"
+        "xdg-desktop-por" "snapd-desktop-i" "update-notifier"
+        "nautilus" "gnome-terminal-" "gnome-software"
+        )
+
+        # Build pattern ensuring the name terminates at a quote or comma
+        # Format: users:(("name1",|name2",)
+        joined_patterns=$(IFS='|'; echo "${allowed_x11_processes[*]}")
+        allowed_pattern="users:\(\(\"(${joined_patterns})(\"|,)"
+
+        filtered_x11_processes=$(echo "$x11_processes" | grep -v -E "$allowed_pattern")
+        if [ -n "${filtered_x11_processes}" ]; then
+            print_error "unexpected X11 processes found:"
+            echo "$filtered_x11_processes"
+        fi
+    fi
+fi
+
 echo
 echo "---------- Apparmor check ----------"
 echo
