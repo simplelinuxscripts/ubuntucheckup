@@ -183,8 +183,8 @@ ubuntu_wayland_sessions=$(ls /usr/share/wayland-sessions/ | grep -E "ubuntu.*\.d
 if [ -z "${ubuntu_wayland_sessions}" ]; then
     print_error "no ubuntu wayland session is available"
 # Check that current session type is wayland (safer than X11 and Xorg)
-elif ! [ "$XDG_SESSION_TYPE" == "wayland" ]; then
-    print_error "wayland session type was not selected in login screen ($XDG_SESSION_TYPE)"
+elif ! [ "${XDG_SESSION_TYPE:-}" == "wayland" ]; then
+    print_error "wayland session type was not selected in login screen (${XDG_SESSION_TYPE:-})"
 else
     print_success "wayland session"
 fi
@@ -360,7 +360,7 @@ if [ "${XDG_SESSION_TYPE:-}" != "x11" ]; then # In case of X11 session, every ap
     else
         # Classic X11 apps in KDE and GNOME
         allowed_x11_processes=(
-        "soffice\.bin" # remove it if you run Libreoffice in wayland
+        "soffice\.bin" # for Libreoffice apt package run in Xwayland - this line can be removed if Libreoffice is run in wayland
         "gmenudbusmenupr" "kaccess" "kded6" "kioworker" "ksmserver" "xembedsniproxy" "xsettingsd"
         "gnome-shell" "gnome-session-b" "mutter-x11-fram" "gnome-settings-"
         "gsd-"
@@ -375,11 +375,16 @@ if [ "${XDG_SESSION_TYPE:-}" != "x11" ]; then # In case of X11 session, every ap
         allowed_pattern="users:\(\(\"(${joined_patterns})(\"|,)"
 
         filtered_x11_processes=$(echo "$x11_processes" | grep -v -E "$allowed_pattern")
+        if [ "${XDG_SESSION_TYPE:-}" == "wayland" ]; then
+            str="Xwayland"
+        else
+            str="X11"
+        fi
         if [ -n "${filtered_x11_processes}" ]; then
-            print_warning "unexpected X11 processes found:"
+            print_warning "unexpected $str processes found:"
             echo "$filtered_x11_processes"
         else
-            print_success "Xwayland apps"
+            print_success "$str processes"
         fi
     fi
 fi
@@ -1035,13 +1040,13 @@ else
     print_error "chromium extensions check is skipped because chromium snap folder ${SNAP_FOLDER}/chromium does not exist"
 fi
 
-# Check libreoffice
+# Check Libreoffice. Assumption is that Libreoffice is installed with apt (if you installed Libreoffice by other means like snap or flatpak, adapt below code as needed)
 error_found=0
 # check required LibreOffice packages
 required_lo_pkgs="libreoffice-core libreoffice-common libreoffice-writer libreoffice-calc libreoffice-impress libreoffice-gtk3"
 for pkg in $required_lo_pkgs; do
     if ! dpkg-query -W -f='${Status}' "$pkg" 2>/dev/null | grep -q "install ok installed"; then
-        print_error "LibreOffice component missing: $pkg"
+        print_error "LibreOffice apt components missing: $pkg"
         error_found=1
     fi
 done
@@ -1058,6 +1063,40 @@ if ( ! echo "$unopkg_list_shared" | grep -q "<none>" ) && \
    ( echo "$unopkg_list_shared" | grep -Ev "^(All deployed|Identifier|$|<none>)" >/dev/null ); then
     print_error "LibreOffice system‑wide extensions found ('sudo unopkg list --shared' to be run to see them)"
     error_found=1
+fi
+# check LibreOffice macro setting
+libreoffice_config_file="${HOME}/.config/libreoffice/4/user/registrymodifications.xcu"
+if [ ! -f "$libreoffice_config_file" ]; then
+    print_error "LibreOffice configuration file not found: $libreoffice_config_file"
+    error_found=1
+else
+    libreoffice_config_security_line=$(grep -i "MacroSecurityLevel" "$libreoffice_config_file")
+    if [ -z "$libreoffice_config_security_line" ]; then
+        print_error "LibreOffice macro security level not found in $libreoffice_config_file"
+        error_found=1
+    else
+        # extract the numerical value of MacroSecurityLevel, which corresponds to Tools / Options / Security / Macro Security:
+        # 0: low (not recommended)
+        # 1: medium
+        # 2: high
+        # 3: Very high
+        libreoffice_config_security_level=$(echo "$libreoffice_config_security_line" | sed -n 's/.*>\([0-9]*\)<\/value>.*/\1/p')      
+        if [ "$libreoffice_config_security_level" -lt 2 ]; then
+            print_error "LibreOffice macro security level is not high: $libreoffice_config_security_level"
+            error_found=1
+        elif [ "$libreoffice_config_security_level" -lt 3 ]; then
+            print_error "LibreOffice macro security level is not very high: $libreoffice_config_security_level"
+            error_found=1
+        fi
+    fi
+    libreoffice_disable_active_contents=$(grep -i "DisableActiveContent" "$libreoffice_config_file")
+    if [ -z "$libreoffice_disable_active_contents" ]; then
+        print_error "LibreOffice disable active contents not found in $libreoffice_config_file"
+        error_found=1
+    elif ! $(echo "$libreoffice_disable_active_contents" | grep -q "<value>true</value>"); then
+        print_error "LibreOffice disable active contents is off in $libreoffice_config_file"
+        error_found=1
+    fi
 fi
 # check LibreOffice KDE integration packages if any - they may or may not be installed, as they may be unstable and libreoffice-gtk3 may then be preferred
 kde_plasma_installed=$(dpkg-query -W -f='${Status}\n' plasma-desktop plasma-workspace 2>/dev/null | grep -c "install ok installed")
@@ -1461,7 +1500,7 @@ if snap list --all | grep -v " canonical\*" | grep -v " kde\*" | grep -v " mozil
     print_error "above snap packages have an unexpected publisher"
     snap_error_found=1
 fi
-if snap list --all | grep -v "/stable" | grep -v "     Publisher     "; then
+if snap list --all | grep -v "latest/stable" | grep -v "1/stable" | grep -v "     Publisher     "; then
     print_error "above snap packages are not stable"
     snap_error_found=1
 fi
