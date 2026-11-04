@@ -1064,7 +1064,7 @@ if ( ! echo "$unopkg_list_shared" | grep -q "<none>" ) && \
     print_error "LibreOffice system‑wide extensions found ('sudo unopkg list --shared' to be run to see them)"
     error_found=1
 fi
-# check LibreOffice macro setting
+# check LibreOffice macros + active contents setting
 libreoffice_config_file="${HOME}/.config/libreoffice/4/user/registrymodifications.xcu"
 if [ ! -f "$libreoffice_config_file" ]; then
     print_error "LibreOffice configuration file not found: $libreoffice_config_file"
